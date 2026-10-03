@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Supply Smile">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <title>Stock count · Supply Smile</title>
+  <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+  <link href="vendor/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="css/app.css" rel="stylesheet">
+</head>
+<body>
+  <header id="topbar"></header>
+  <div class="d-flex layout">
+    <nav id="sidebar"></nav>
+    <main class="flex-grow-1 p-3 p-md-4 use-page">
+      <h1 class="page-title">Stock count</h1>
+      <p class="page-sub">Count what is on the shelf and type it in. Leave an item blank if you did not count it. Saving corrects the stock to match the shelf.</p>
+
+      <section class="card use-card mb-3 d-none" id="flags-card">
+        <div class="use-step"><i class="bi bi-flag-fill text-danger"></i>Count these first: used while the system showed too little</div>
+        <div id="flags" class="d-flex flex-column gap-2"></div>
+      </section>
+
+      <section class="card mb-3">
+        <div class="p-3 d-flex flex-wrap gap-2 align-items-center">
+          <div class="input-group" style="max-width:280px">
+            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+            <input class="form-control" id="search" placeholder="Find item" aria-label="Find item">
+          </div>
+          <select class="form-select w-auto" id="category" aria-label="Category"></select>
+          <div class="form-check form-switch ms-1">
+            <input class="form-check-input" type="checkbox" id="only-diff"><label class="form-check-label small" for="only-diff">Only differences</label>
+          </div>
+          <button class="btn btn-sm btn-outline-secondary ms-auto" type="button" id="fill-rest" title="Items you checked and found correct">
+            <i class="bi bi-check2-all me-1"></i>Mark shown blanks as matching</button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-stack align-middle mb-0 count-table">
+            <thead><tr><th>Item</th><th class="text-end">System</th><th style="width:130px">On shelf</th><th class="text-end">Difference</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card dash-card mb-3">
+        <div class="dash-card-head"><div><h2 class="dash-card-title">Past counts</h2><p class="dash-card-sub">Tap one to see what changed</p></div></div>
+        <ul class="recent-list" id="history"></ul>
+      </section>
+
+      <div class="save-bar">
+        <div class="small" id="summary">Nothing counted yet</div>
+        <button class="btn btn-primary btn-lg px-4" type="button" id="review" disabled><i class="bi bi-clipboard-check me-1"></i>Review &amp; save</button>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal fade" id="confirm" tabindex="-1" aria-labelledby="confirm-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable"><div class="modal-content">
+      <div class="modal-header"><h2 class="modal-title fs-5" id="confirm-title">Save stock count</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body" id="confirm-body"></div>
+      <div class="modal-footer">
+        <input class="form-control me-auto" id="note" placeholder="Note (optional), e.g. Monthly count Sept" maxlength="200" style="max-width:260px">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Back</button>
+        <button type="button" class="btn btn-primary" id="save">Save count</button>
+      </div>
+    </div></div>
+  </div>
+  <div class="modal fade" id="detail" tabindex="-1" aria-labelledby="detail-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable"><div class="modal-content">
+      <div class="modal-header"><h2 class="modal-title fs-5" id="detail-title">Count</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body" id="detail-body"></div>
+    </div></div>
+  </div>
+
+  <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/fb-core.js"></script>
+  <script src="js/fb-inventory.js"></script>
+  <script src="js/backend.js"></script>
+  <script src="js/common.js"></script>
+  <script>
+    const inr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+    startPage(async me => {
+      if (me.role !== 'ADMIN') { document.querySelector('main').replaceChildren(el('div', { class: 'alert alert-warning', text: 'Only the Admin can save a stock count.' })); return; }
+      const meta = await api.get('/api/meta');
+      fillSelect($('category'), meta.categories.map(c => [c, c]), 'All categories');
+      let items = [], flags = [], costs = {};
+      const counted = {};           // itemId -> number (blank = not counted)
+      const q = new URLSearchParams(location.search);
+
+      async function load() {
+        const [a, f] = await Promise.all([api.get('/api/items'), api.get('/api/flags')]);
+        items = a.items; flags = f.flags;
+        items.forEach(i => { costs[i.id] = i.lastCost; });      // last price paid, for the value of a difference
+        renderFlags(); render();
+      }
+      function renderFlags() {
+        $('flags-card').classList.toggle('d-none', !flags.length);
+        $('flags').replaceChildren(...flags.map(f => el('div', { class: 'd-flex align-items-center gap-2 flex-wrap' },
+          el('span', { class: 'flex-grow-1 small' }, el('strong', { text: f.itemName }),
+            ` · ${f.qty} ${f.unit} used on ${fmtDate(f.date)}${f.procedureName ? ' (' + f.procedureName + ')' : ''} by ${f.userName}`),
+          el('button', { class: 'btn btn-sm btn-outline-primary', type: 'button', text: 'Count it', onclick: () => { $('search').value = f.itemName; render(); } }),
+          el('button', { class: 'btn btn-sm btn-link text-secondary', type: 'button', text: 'Clear flag', onclick: async () => {
+            await api.post(`/api/flags/${f.id}/resolve`, { resolution: 'Checked, no change' }); toast('Flag cleared.', 'secondary'); load(); } }))));
+      }
+      const diffOf = it => counted[it.id] === undefined ? null : counted[it.id] - it.qty;
+      function visible() {
+        const t = $('search').value.trim().toLowerCase(), c = $('category').value, only = $('only-diff').checked;
+        return items.filter(i => (!t || i.name.toLowerCase().includes(t)) && (!c || i.category === c) && (!only || diffOf(i)));
+      }
+      function render() {
+        const flagged = new Set(flags.map(f => f.itemId));
+        const rows = visible();
+        $('rows').replaceChildren(...rows.map(it => {
+          const d = diffOf(it);
+          const input = el('input', { class: 'form-control form-control-sm text-end', type: 'number', min: '0', inputmode: 'numeric',
+            value: counted[it.id] ?? '', placeholder: '–', 'aria-label': `Counted ${it.name}`,
+            oninput: e => { const v = e.target.value; if (v === '') delete counted[it.id]; else counted[it.id] = Math.max(0, parseInt(v, 10) || 0);
+              const cell = e.target.closest('tr').querySelector('.diff'); paintDiff(cell, it); summary(); } });
+          const diffCell = el('td', { class: 'text-end diff' });
+          paintDiff(diffCell, it);
+          return el('tr', { class: flagged.has(it.id) ? 'table-danger-subtle' : '' },
+            el('td', {}, el('div', { class: 'fw-semibold', text: it.name }),
+              el('div', { class: 'small text-secondary', text: `${it.category}${flagged.has(it.id) ? ' · flagged' : ''}` })),
+            el('td', { class: 'text-end text-nowrap', text: `${it.qty} ${it.unit}` }),
+            el('td', {}, input), diffCell);
+        }));
+        if (!rows.length) $('rows').append(emptyRow(4, 'No items match.'));
+        summary();
+      }
+      function paintDiff(cell, it) {
+        const d = diffOf(it);
+        cell.className = 'text-end diff text-nowrap ' + (d === null ? 'text-secondary' : d === 0 ? 'text-success' : d < 0 ? 'text-danger fw-semibold' : 'text-primary fw-semibold');
+        cell.textContent = d === null ? '' : d === 0 ? '✓ matches' : `${d > 0 ? '+' : '−'}${Math.abs(d)} ${it.unit}`;
+      }
+      function summary() {
+        const done = items.filter(i => counted[i.id] !== undefined);
+        const diffs = done.filter(i => diffOf(i));
+        const value = diffs.reduce((s, i) => s + diffOf(i) * (costs[i.id] || 0), 0);
+        $('summary').replaceChildren(done.length
+          ? el('span', {}, el('strong', { text: `${done.length} counted` }), ` · ${diffs.length} difference${diffs.length === 1 ? '' : 's'}`,
+              diffs.length ? el('span', { class: value < 0 ? 'text-danger' : 'text-primary', text: ` · ${value < 0 ? '−' : '+'}${inr.format(Math.abs(value))}` }) : '')
+          : 'Nothing counted yet');
+        $('review').disabled = !done.length;
+      }
+      ['search', 'category', 'only-diff'].forEach(id => $(id).addEventListener('input', render));
+      $('fill-rest').addEventListener('click', () => { visible().forEach(i => { if (counted[i.id] === undefined) counted[i.id] = i.qty; }); render(); });
+
+      $('review').addEventListener('click', () => {
+        const done = items.filter(i => counted[i.id] !== undefined), diffs = done.filter(i => diffOf(i));
+        $('confirm-body').replaceChildren(
+          el('p', { text: `${done.length} item${done.length === 1 ? '' : 's'} counted. ${diffs.length ? 'These will be corrected:' : 'Everything matches the system.'}` }),
+          diffs.length ? el('table', { class: 'table table-sm' }, el('tbody', {}, ...diffs.map(i => tr(i.name, `${i.qty} → ${counted[i.id]} ${i.unit}`,
+            el('span', { class: diffOf(i) < 0 ? 'text-danger' : 'text-primary', text: `${diffOf(i) > 0 ? '+' : ''}${diffOf(i)}` }))))) : '');
+        bootstrap.Modal.getOrCreateInstance($('confirm')).show();
+      });
+      $('save').addEventListener('click', async () => {
+        $('save').disabled = true;
+        try {
+          const r = await api.post('/api/counts', { note: $('note').value,
+            lines: Object.entries(counted).map(([itemId, c]) => ({ itemId: Number(itemId), counted: c })) });
+          bootstrap.Modal.getInstance($('confirm')).hide();
+          toast(`Count saved: ${r.itemsCounted} counted, ${r.itemsChanged} corrected (${inr.format(r.valueDifference)}).`);
+          Object.keys(counted).forEach(k => delete counted[k]);
+          await load(); await loadHistory();
+        } catch (e) { showError(e); } finally { $('save').disabled = false; }
+      });
+
+      async function loadHistory() {
+        const { counts } = await api.get('/api/counts');
+        $('history').replaceChildren(...counts.map(c => el('li', { role: 'button', tabindex: '0', class: 'count-hist', onclick: () => openDetail(c.id) },
+          el('span', { class: 'rl-ic out' }, el('i', { class: 'bi bi-clipboard-check' })),
+          el('div', { class: 'min-w-0 flex-grow-1' }, el('div', { class: 'rl-name', text: `${fmtDate(c.date)}${c.note ? ' · ' + c.note : ''}` }),
+            el('div', { class: 'rl-sub', text: `${c.itemsCounted} counted · ${c.itemsChanged} corrected · by ${c.userName}` })),
+          el('span', { class: 'rl-qty ' + (c.valueDifference < 0 ? 'text-danger' : ''), text: (c.valueDifference < 0 ? '−' : c.valueDifference > 0 ? '+' : '') + inr.format(Math.abs(c.valueDifference)) }))));
+        if (!counts.length) $('history').append(el('li', { class: 'small text-secondary', text: 'No counts saved yet.' }));
+      }
+      async function openDetail(id) {
+        const d = await api.get('/api/counts/' + id);
+        $('detail-title').textContent = `Count of ${fmtDate(d.date)}`;
+        $('detail-body').replaceChildren(el('p', { class: 'small text-secondary', text: `By ${d.userName}${d.note ? ' · ' + d.note : ''}` }),
+          el('table', { class: 'table table-sm' }, el('thead', {}, el('tr', {}, ...['Item', 'System', 'Shelf', 'Diff'].map(h => el('th', { text: h })))),
+            el('tbody', {}, ...d.lines.map(l => tr(l.name, l.system, l.counted,
+              el('span', { class: l.diff < 0 ? 'text-danger fw-semibold' : l.diff > 0 ? 'text-primary fw-semibold' : 'text-success', text: l.diff ? `${l.diff > 0 ? '+' : ''}${l.diff}` : '✓' }))))));
+        bootstrap.Modal.getOrCreateInstance($('detail')).show();
+      }
+      await load(); await loadHistory();
+      if (q.get('item')) { const it = items.find(i => i.id === Number(q.get('item'))); if (it) { $('search').value = it.name; render(); } }
+    });
+  </script>
+</body>
+</html>

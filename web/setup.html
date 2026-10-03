@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Supply Smile">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <title>Set up Supply Smile</title>
+  <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+  <link href="vendor/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="css/login.css" rel="stylesheet">
+  <script>/* skip the loader for people who prefer less motion, and after the first time this session */
+    try { if (matchMedia("(prefers-reduced-motion: reduce)").matches || sessionStorage.getItem("ss-seen")) document.documentElement.classList.add("ss-quick"); } catch (e) {}</script>
+</head>
+<body class="login-page ss-loading">
+  <!-- Smile-meter loader: the tooth brightens as the app loads, then the sign-in card slides up -->
+  <div id="smile-loader" role="status" aria-live="polite" aria-label="Loading Supply Smile">
+    <div class="sm-center">
+      <svg class="sm-tooth" viewBox="18 8 104 146" aria-hidden="true">
+        <defs>
+          <clipPath id="sm-clip"><path d="M60 20C40 20 28 35 30 55c2 17 10 25 12 45 2 20 6 40 14 40s8-25 14-32c6 7 6 32 14 32s12-20 14-40c2-20 10-28 12-45 2-20-10-35-30-35-6 0-8 4-10 4s-4-4-10-4z"/></clipPath>
+          <linearGradient id="sm-enamel" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0" stop-color="#e6fffb"/><stop offset="1" stop-color="#ffffff"/>
+          </linearGradient>
+        </defs>
+        <path class="sm-base" d="M60 20C40 20 28 35 30 55c2 17 10 25 12 45 2 20 6 40 14 40s8-25 14-32c6 7 6 32 14 32s12-20 14-40c2-20 10-28 12-45 2-20-10-35-30-35-6 0-8 4-10 4s-4-4-10-4z"/>
+        <g clip-path="url(#sm-clip)">
+          <rect class="sm-fill" id="sm-fill" x="18" y="154" width="104" height="146" fill="url(#sm-enamel)"/>
+          <rect class="sm-glint" x="18" y="8" width="26" height="170" transform="rotate(20 70 80)"/>
+        </g>
+        <path class="sm-outline" d="M60 20C40 20 28 35 30 55c2 17 10 25 12 45 2 20 6 40 14 40s8-25 14-32c6 7 6 32 14 32s12-20 14-40c2-20 10-28 12-45 2-20-10-35-30-35-6 0-8 4-10 4s-4-4-10-4z"/>
+        <g class="sm-sparkles">
+          <path d="M112 22l3 8 8 3-8 3-3 8-3-8-8-3 8-3z"/>
+          <path d="M28 30l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/>
+          <circle cx="116" cy="60" r="3"/>
+        </g>
+      </svg>
+      <div class="sm-name">Supply <span>Smile</span></div>
+      <div class="sm-meter" aria-hidden="true"><div class="sm-bar"><span id="sm-bar"></span></div></div>
+      <div class="sm-label"><span id="sm-label">Waking up…</span> <span id="sm-pct">0%</span></div>
+    </div>
+  </div>
+
+  <div class="container-fluid p-0">
+    <div class="row g-0 login-shell">
+
+      <!-- LEFT: brand story with animated tooth and live-looking stock chips -->
+      <section class="col-lg-6 hero" aria-label="About Supply Smile">
+        <div class="hero-inner d-flex flex-column justify-content-between p-4 p-lg-5">
+          <div class="hero-brand d-flex align-items-center gap-2">
+            <img class="dot" src="icons/icon.svg" alt="">
+            Supply Smile <span class="fw-normal opacity-75" id="hero-clinic"></span>
+          </div>
+
+          <div class="my-4 my-lg-0">
+            <h1 class="mb-3">Every cartridge, glove and bur &mdash; counted.</h1>
+            <p class="lead mb-0">Stock, expiry dates and daily usage for your clinic, in one calm place.</p>
+          </div>
+
+          <div class="stage d-none d-lg-block" aria-hidden="true">
+            <svg class="tooth" viewBox="0 0 140 160">
+              <path d="M60 20C40 20 28 35 30 55c2 17 10 25 12 45 2 20 6 40 14 40s8-25 14-32c6 7 6 32 14 32s12-20 14-40c2-20 10-28 12-45 2-20-10-35-30-35-6 0-8 4-10 4s-4-4-10-4z"/>
+              <circle class="sparkle" cx="104" cy="30" r="4"/>
+              <circle class="sparkle" cx="116" cy="44" r="2.5" style="animation-delay:2.6s"/>
+            </svg>
+            <div class="chip chip-1"><span class="ic ic-ok"><i class="bi bi-clipboard2-pulse"></i></span>
+              <span>Procedure kits<small>One tap records every item used</small></span></div>
+            <div class="chip chip-2"><span class="ic ic-warn"><i class="bi bi-hourglass-split"></i></span>
+              <span>Expiry alerts<small>Soonest-expiring batch used first</small></span></div>
+            <div class="chip chip-3"><span class="ic ic-danger"><i class="bi bi-cart-plus"></i></span>
+              <span>Low stock<small>Reorder list, sent on WhatsApp</small></span></div>
+          </div>
+
+          <div class="hero-stats row g-3 d-none d-lg-flex">
+            <div class="col-4"><div class="num"><i class="bi bi-wifi-off"></i></div><div class="lbl">works without internet</div></div>
+            <div class="col-4"><div class="num"><i class="bi bi-phone"></i></div><div class="lbl">on PC, tablet and phone</div></div>
+            <div class="col-4"><div class="num"><i class="bi bi-shield-check"></i></div><div class="lbl">daily automatic backup</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT: first-run setup -->
+      <main class="col-lg-6 d-flex align-items-center justify-content-center p-4 p-lg-5">
+        <div class="signin">
+          <img class="logo mb-3" src="icons/icon.svg" alt="">
+          <h2 class="h3 mb-1">Welcome to Supply Smile</h2>
+          <p class="sub mb-4">Two minutes to set up your clinic. You will be the Admin.</p>
+          <form id="setup-form" novalidate>
+            <div class="form-floating mb-3">
+              <input class="form-control" id="code" placeholder="Setup code" required autocomplete="off" autocapitalize="none" autofocus>
+              <label for="code"><i class="bi bi-key me-1"></i>Setup code (chosen when the database was created)</label>
+            </div>
+            <div class="form-floating mb-3">
+              <input class="form-control" id="clinic" placeholder="Clinic name" required maxlength="80">
+              <label for="clinic"><i class="bi bi-hospital me-1"></i>Clinic name</label>
+            </div>
+            <div class="form-floating mb-3">
+              <input class="form-control" id="fullname" placeholder="Your name" required maxlength="100">
+              <label for="fullname"><i class="bi bi-person me-1"></i>Your name (e.g. Dr. Meera Rao)</label>
+            </div>
+            <div class="form-floating mb-3">
+              <input class="form-control" id="username" placeholder="Username" required maxlength="50" autocomplete="username" autocapitalize="none">
+              <label for="username"><i class="bi bi-at me-1"></i>Username to sign in with</label>
+            </div>
+            <div class="row g-2 mb-2">
+              <div class="col-6"><div class="form-floating">
+                <input class="form-control" id="password" type="password" placeholder="Password" required minlength="8" autocomplete="new-password">
+                <label for="password"><i class="bi bi-lock me-1"></i>Password</label></div></div>
+              <div class="col-6"><div class="form-floating">
+                <input class="form-control" id="password2" type="password" placeholder="Again" required minlength="8" autocomplete="new-password">
+                <label for="password2">Type it again</label></div></div>
+            </div>
+            <div class="form-text mb-3">At least 8 characters. Keep it safe: it protects your stock records.</div>
+            <div class="form-check mb-3">
+              <input class="form-check-input" type="checkbox" id="procs" checked>
+              <label class="form-check-label small" for="procs">Add common procedures (scaling, filling, root canal, extraction, crown, impression). You can change them later.</label>
+            </div>
+            <div id="setup-error" class="alert alert-danger py-2 small d-none" role="alert"></div>
+            <button class="btn btn-signin w-100 d-flex align-items-center justify-content-center gap-2" type="submit" id="submit">
+              <span id="submit-text">Start using Supply Smile</span><i class="bi bi-arrow-right"></i>
+              <span class="spinner-border spinner-border-sm d-none" id="spinner" aria-hidden="true"></span>
+            </button>
+          </form>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/fb-core.js"></script>
+  <script src="js/fb-inventory.js"></script>
+  <script src="js/backend.js"></script>
+  <script src="js/smile-loader.js"></script>
+  <script>
+    const $ = id => document.getElementById(id);
+    SS.request('GET', '/api/setup').then(s => {
+      if (!s.needed) { location.href = 'login.html'; return; }
+      SmileLoader.done();
+    }).catch(() => SmileLoader.done());
+    $('clinic').addEventListener('input', () => { $('hero-clinic').textContent = $('clinic').value ? '· ' + $('clinic').value : ''; });
+    function fail(msg) { $('setup-error').textContent = msg; $('setup-error').classList.remove('d-none'); }
+    $('setup-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      $('setup-error').classList.add('d-none');
+      const f = { setupCode: $('code').value.trim(), clinicName: $('clinic').value.trim(), fullName: $('fullname').value.trim(), username: $('username').value.trim(),
+                  password: $('password').value, commonProcedures: $('procs').checked };
+      if (!f.setupCode) return fail('Enter the setup code.');
+      if (!f.clinicName || !f.fullName || !f.username) return fail('Fill in the clinic name, your name and a username.');
+      if (f.password.length < 8) return fail('The password needs at least 8 characters.');
+      if (f.password !== $('password2').value) return fail('The two passwords are different.');
+      $('submit').disabled = true; $('spinner').classList.remove('d-none');
+      try {
+        await SS.request('POST', '/api/setup', f);
+        try { localStorage.setItem('dcims-username', f.username); } catch (x) { /* ignore */ }
+        location.href = 'home.html?welcome=1';
+      } catch (err) { fail(err.message); $('submit').disabled = false; $('spinner').classList.add('d-none'); }
+    });
+  </script>
+</body>
+</html>

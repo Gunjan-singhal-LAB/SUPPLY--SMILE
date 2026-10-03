@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Supply Smile">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <title>Items · Supply Smile</title>
+  <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+  <link href="vendor/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="css/app.css" rel="stylesheet">
+</head>
+<body>
+  <header id="topbar"></header>
+  <div class="d-flex layout">
+    <nav id="sidebar"></nav>
+    <main class="flex-grow-1 p-3 p-md-4">
+      <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+        <div>
+          <h1 class="page-title">Items</h1>
+          <p class="page-sub">Current stock of every supply, worked out from its batches</p>
+        </div>
+        <a class="btn btn-primary admin-only" href="item.html?new=1"><i class="bi bi-plus-lg me-1"></i>Add item</a>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-body row g-2">
+          <div class="col-md-5">
+            <div class="input-group">
+              <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+              <input class="form-control" id="search" placeholder="Search by item name" aria-label="Search">
+            </div>
+          </div>
+          <div class="col-6 col-md-4"><select class="form-select" id="category" aria-label="Category"></select></div>
+          <div class="col-6 col-md-3"><select class="form-select" id="status" aria-label="Status"></select></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-responsive">
+          <table class="table table-stack table-hover mb-0 align-middle" id="items-table">
+            <thead><tr><th>Item</th><th>Category</th><th class="text-end">Quantity</th><th>Nearest expiry</th><th>Supplier</th><th>Status</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div class="card-footer bg-white small text-secondary" id="count"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/fb-core.js"></script>
+  <script src="js/fb-inventory.js"></script>
+  <script src="js/backend.js"></script>
+  <script src="js/common.js"></script>
+  <script>
+    startPage(async () => {
+      const [meta, res] = await Promise.all([api.get('/api/meta'), api.get('/api/items')]);
+      const items = res.items;
+      fillSelect($('category'), meta.categories.map(c => [c, c]), 'All categories');
+      fillSelect($('status'), [['REORDER', 'To reorder (low + out)'], ...Object.entries(STATUS).map(([k, v]) => [k, v.label])], 'All statuses');
+      const q = new URLSearchParams(location.search);
+      if (q.get('status')) $('status').value = q.get('status');
+      if (q.get('category')) $('category').value = q.get('category');
+
+      function render() {
+        const text = $('search').value.trim().toLowerCase(), cat = $('category').value, st = $('status').value;
+        const list = items.filter(i => (!text || i.name.toLowerCase().includes(text)) &&
+          (!cat || i.category === cat) && (!st || i.status === st || (st === 'REORDER' && (i.status === 'LOW' || i.status === 'OUT'))));
+        $('rows').replaceChildren(...list.map(i => {
+          const r = tr(el('a', { href: 'item.html?id=' + i.id, class: 'fw-semibold text-decoration-none', text: i.name }),
+            el('span', { class: 'text-secondary', text: i.category }), `${i.qty} ${i.unit}`,
+            fmtDate(i.nearestExpiry), i.supplierName || '-', badge(i.status));
+          r.children[2].classList.add('text-end');
+          return r;
+        }));
+        if (!list.length) $('rows').append(emptyRow(6, items.length ? 'No items match these filters.' : 'No items yet. Admin can add the first one.'));
+        $('count').textContent = `Showing ${list.length} of ${items.length} items`;
+      }
+      ['search', 'category', 'status'].forEach(id => $(id).addEventListener('input', render));
+      render();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Supply Smile">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <title>Sign in · Supply Smile</title>
+  <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+  <link href="vendor/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="css/login.css" rel="stylesheet">
+  <script>/* skip the loader for people who prefer less motion, and after the first time this session */
+    try { if (matchMedia("(prefers-reduced-motion: reduce)").matches || sessionStorage.getItem("ss-seen")) document.documentElement.classList.add("ss-quick"); } catch (e) {}</script>
+</head>
+<body class="login-page ss-loading">
+  <!-- Smile-meter loader: the tooth brightens as the app loads, then the sign-in card slides up -->
+  <div id="smile-loader" role="status" aria-live="polite" aria-label="Loading Supply Smile">
+    <div class="sm-center">
+      <svg class="sm-tooth" viewBox="18 8 104 146" aria-hidden="true">
+        <defs>
+          <clipPath id="sm-clip"><path d="M60 20C40 20 28 35 30 55c2 17 10 25 12 45 2 20 6 40 14 40s8-25 14-32c6 7 6 32 14 32s12-20 14-40c2-20 10-28 12-45 2-20-10-35-30-35-6 0-8 4-10 4s-4-4-10-4z"/></clipPath>
+          <linearGradient id="sm-enamel" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0" stop-color="#e6fffb"/><stop offset="1" stop-color="#ffffff"/>
+          </linearGradient>
+        </defs>
+        <path class="sm-base" d="M60 20C40 20 28 35 30 55c2 17 10 25 12 45 2 20 6 40 14 40s8-25 14-32c6 7 6 32 14 32s12-20 14-40c2-20 10-28 12-45 2-20-10-35-30-35-6 0-8 4-10 4s-4-4-10-4z"/>
+        <g clip-path="url(#sm-clip)">
+          <rect class="sm-fill" id="sm-fill" x="18" y="154" width="104" height="146" fill="url(#sm-enamel)"/>
+          <rect class="sm-glint" x="18" y="8" width="26" height="170" transform="rotate(20 70 80)"/>
+        </g>
+        <path class="sm-outline" d="M60 20C40 20 28 35 30 55c2 17 10 25 12 45 2 20 6 40 14 40s8-25 14-32c6 7 6 32 14 32s12-20 14-40c2-20 10-28 12-45 2-20-10-35-30-35-6 0-8 4-10 4s-4-4-10-4z"/>
+        <g class="sm-sparkles">
+          <path d="M112 22l3 8 8 3-8 3-3 8-3-8-8-3 8-3z"/>
+          <path d="M28 30l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/>
+          <circle cx="116" cy="60" r="3"/>
+        </g>
+      </svg>
+      <div class="sm-name">Supply <span>Smile</span></div>
+      <div class="sm-meter" aria-hidden="true"><div class="sm-bar"><span id="sm-bar"></span></div></div>
+      <div class="sm-label"><span id="sm-label">Waking up…</span> <span id="sm-pct">0%</span></div>
+    </div>
+  </div>
+
+  <div class="container-fluid p-0">
+    <div class="row g-0 login-shell">
+
+      <!-- LEFT: brand story with animated tooth and live-looking stock chips -->
+      <section class="col-lg-6 hero" aria-label="About Supply Smile">
+        <div class="hero-inner d-flex flex-column justify-content-between p-4 p-lg-5">
+          <div class="hero-brand d-flex align-items-center gap-2">
+            <img class="dot" src="icons/icon.svg" alt="">
+            Supply Smile <span class="fw-normal opacity-75" id="hero-clinic"></span>
+          </div>
+
+          <div class="my-4 my-lg-0">
+            <h1 class="mb-3">Every cartridge, glove and bur &mdash; counted.</h1>
+            <p class="lead mb-0">Stock, expiry dates and daily usage for your clinic, in one calm place.</p>
+          </div>
+
+          <div class="stage d-none d-lg-block" aria-hidden="true">
+            <svg class="tooth" viewBox="0 0 140 160">
+              <path d="M60 20C40 20 28 35 30 55c2 17 10 25 12 45 2 20 6 40 14 40s8-25 14-32c6 7 6 32 14 32s12-20 14-40c2-20 10-28 12-45 2-20-10-35-30-35-6 0-8 4-10 4s-4-4-10-4z"/>
+              <circle class="sparkle" cx="104" cy="30" r="4"/>
+              <circle class="sparkle" cx="116" cy="44" r="2.5" style="animation-delay:2.6s"/>
+            </svg>
+            <div class="chip chip-1"><span class="ic ic-ok"><i class="bi bi-clipboard2-pulse"></i></span>
+              <span>Procedure kits<small>One tap records every item used</small></span></div>
+            <div class="chip chip-2"><span class="ic ic-warn"><i class="bi bi-hourglass-split"></i></span>
+              <span>Expiry alerts<small>Soonest-expiring batch used first</small></span></div>
+            <div class="chip chip-3"><span class="ic ic-danger"><i class="bi bi-cart-plus"></i></span>
+              <span>Low stock<small>Reorder list, sent on WhatsApp</small></span></div>
+          </div>
+
+          <div class="hero-stats row g-3 d-none d-lg-flex">
+            <div class="col-4"><div class="num"><i class="bi bi-wifi-off"></i></div><div class="lbl">works without internet</div></div>
+            <div class="col-4"><div class="num"><i class="bi bi-phone"></i></div><div class="lbl">on PC, tablet and phone</div></div>
+            <div class="col-4"><div class="num"><i class="bi bi-shield-check"></i></div><div class="lbl">daily automatic backup</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT: sign-in form -->
+      <main class="col-lg-6 d-flex align-items-center justify-content-center p-4 p-lg-5">
+        <div class="signin">
+          <img class="logo mb-3" src="icons/icon.svg" alt="">
+          <h2 class="h3 mb-1" id="greeting">Welcome back</h2>
+          <p class="sub mb-4" id="sub">Sign in to manage today's stock.</p>
+
+          <form id="login-form" novalidate>
+            <div class="form-floating mb-3">
+              <input class="form-control" id="username" placeholder="Username" autocomplete="username" required autofocus>
+              <label for="username"><i class="bi bi-person me-1"></i>Username</label>
+            </div>
+
+            <div class="form-floating mb-1 pw-wrap">
+              <input class="form-control pe-5" id="password" type="password" placeholder="Password" autocomplete="current-password" required>
+              <label for="password"><i class="bi bi-lock me-1"></i>Password</label>
+              <button class="pw-toggle" type="button" id="pw-toggle" aria-label="Show password" aria-pressed="false">
+                <i class="bi bi-eye"></i></button>
+            </div>
+            <div class="small text-warning-emphasis mb-2 d-none" id="caps"><i class="bi bi-capslock me-1"></i>Caps Lock is on</div>
+
+            <div class="d-flex justify-content-between align-items-center my-3">
+              <div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="keep">
+                  <label class="form-check-label small" for="keep">Keep me signed in on this PC (12 hours)</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="remember">
+                  <label class="form-check-label small" for="remember">Remember my username</label>
+                </div>
+              </div>
+            </div>
+
+            <div id="login-error" class="alert alert-danger py-2 small d-none" role="alert"></div>
+
+            <button class="btn btn-signin w-100 d-flex align-items-center justify-content-center gap-2" type="submit" id="submit">
+              <span id="submit-text">Sign in</span><i class="bi bi-arrow-right"></i>
+              <span class="spinner-border spinner-border-sm d-none" id="spinner" aria-hidden="true"></span>
+            </button>
+          </form>
+
+          <p class="small text-secondary mt-4 mb-0">
+            <i class="bi bi-shield-lock me-1"></i>Forgot your password? Ask the clinic Admin to reset it.
+          </p>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/fb-core.js"></script>
+  <script src="js/fb-inventory.js"></script>
+  <script src="js/backend.js"></script>
+  <script src="js/smile-loader.js"></script>
+  <script>
+    const $ = id => document.getElementById(id);
+    const h = new Date().getHours();
+    $('greeting').textContent = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+
+    // First time on this PC? Go to setup. Already signed in? Go straight to Home.
+    if (!SS.configured) {
+      SmileLoader.done();
+      $('sub').textContent = 'Not connected yet: add your Firebase details to js/config.js (see the deploy guide).';
+    } else SS.request('GET', '/api/setup').then(s => {
+      SmileLoader.set(90);
+      if (s.needed) { SmileLoader.skip(); location.href = 'setup.html'; return; }
+      if (s.clinicName) $('hero-clinic').textContent = '· ' + s.clinicName;
+      SS.request('GET', '/api/me').then(() => { SmileLoader.skip(); location.href = 'home.html'; })
+        .catch(() => SmileLoader.done());
+    }).catch(e => { SmileLoader.done(); if (e.status === 0) $('sub').textContent = e.message; });
+
+    if (new URLSearchParams(location.search).get('expired')) {
+      $('sub').textContent = 'Your session ended. Please sign in again.';
+    }
+    if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+    // Remember the last username on this PC (never the password).
+    try {
+      const saved = localStorage.getItem('dcims-username');
+      if (saved) { $('username').value = saved; $('remember').checked = true; $('password').focus(); }
+      try { $('keep').checked = localStorage.getItem('dcims-keep') === '1'; } catch (x) { /* ignore */ }
+    } catch (x) { /* ignore */ }
+
+    $('pw-toggle').addEventListener('click', () => {
+      const show = $('password').type === 'password';
+      $('password').type = show ? 'text' : 'password';
+      $('pw-toggle').setAttribute('aria-pressed', String(show));
+      $('pw-toggle').setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+      $('pw-toggle').firstElementChild.className = show ? 'bi bi-eye-slash' : 'bi bi-eye';
+    });
+    $('password').addEventListener('keyup', e => {
+      $('caps').classList.toggle('d-none', !e.getModifierState || !e.getModifierState('CapsLock'));
+    });
+
+    function busy(on) {
+      $('submit').disabled = on;
+      $('submit-text').textContent = on ? 'Signing in...' : 'Sign in';
+      $('spinner').classList.toggle('d-none', !on);
+    }
+    function fail(message) {
+      const err = $('login-error');
+      err.textContent = message;
+      err.classList.remove('d-none');
+      const form = $('login-form');
+      form.classList.remove('shake'); void form.offsetWidth; form.classList.add('shake');
+    }
+
+    $('login-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const username = $('username').value.trim(), password = $('password').value;
+      if (!username || !password) { fail('Enter your username and password.'); return; }
+      $('login-error').classList.add('d-none');
+      busy(true);
+      try {
+        try {
+          await SS.request('POST', '/api/login', { username, password, keepSignedIn: $('keep').checked });
+        } catch (x) { busy(false); fail(x.message || 'Sign in failed.'); $('password').select(); return; }
+        try {
+          if ($('remember').checked) localStorage.setItem('dcims-username', username);
+          else localStorage.removeItem('dcims-username');
+          localStorage.setItem('dcims-keep', $('keep').checked ? '1' : '');
+        } catch (x) { /* ignore */ }
+        location.href = 'home.html';
+      } catch (err) {
+        busy(false);
+        fail('Cannot reach Supply Smile. Check the internet connection.');
+      }
+    });
+  </script>
+</body>
+</html>

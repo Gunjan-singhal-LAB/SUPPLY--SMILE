@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Supply Smile">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <title>Reports · Supply Smile</title>
+  <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+  <link href="vendor/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="css/app.css" rel="stylesheet">
+</head>
+<body>
+  <header id="topbar"></header>
+  <div class="d-flex layout">
+    <nav id="sidebar"></nav>
+    <main class="flex-grow-1 p-3 p-md-4">
+      <h1 class="page-title">Reports</h1>
+      <p class="page-sub">Pick a report and a date range, check it here, then export it.</p>
+
+      <ul class="nav nav-pills mb-3 flex-wrap gap-1" id="report-tabs"></ul>
+      <div class="card mb-3">
+        <div class="card-body row g-2 align-items-end">
+          <div class="col-6 col-md-3"><label class="form-label small" for="from">From</label><input class="form-control" type="date" id="from"></div>
+          <div class="col-6 col-md-3"><label class="form-label small" for="to">To</label><input class="form-control" type="date" id="to"></div>
+          <div class="col-md-6 d-flex gap-2 justify-content-md-end">
+            <button class="btn btn-outline-secondary" type="button" id="pdf"><i class="bi bi-filetype-pdf me-1"></i>Export PDF</button>
+            <button class="btn btn-outline-secondary" type="button" id="excel"><i class="bi bi-file-earmark-excel me-1"></i>Export Excel</button>
+          </div>
+          <div class="col-12 small text-secondary d-none" id="range-note">Current stock and Expiry show today's position; the dates don't apply.</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header bg-white d-flex justify-content-between">
+          <span class="fw-semibold" id="r-title"></span><span class="small text-secondary" id="r-count"></span>
+        </div>
+        <div class="table-responsive"><table class="table table-stack table-hover mb-0 align-middle">
+          <thead id="r-head"></thead><tbody id="r-body"></tbody>
+        </table></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="vendor/jspdf/jspdf.umd.min.js"></script>
+  <script src="vendor/jspdf/jspdf.plugin.autotable.min.js"></script>
+  <script src="vendor/xlsx/xlsx.full.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/fb-core.js"></script>
+  <script src="js/fb-inventory.js"></script>
+  <script src="js/backend.js"></script>
+  <script src="js/common.js"></script>
+  <script>
+    startPage(async me => {
+      const KINDS = [['stock', 'Current stock'], ['history', 'Stock history'], ['usage', 'Usage by procedure'],
+                     ['purchases', 'Purchases'], ['expiry', 'Expiry']];
+      const NO_RANGE = ['stock', 'expiry'];
+      let active = 'stock', report = null;
+      const wanted = new URLSearchParams(location.search).get('report');
+      if (KINDS.some(([k]) => k === wanted)) active = wanted;
+      const d = new Date(me.today); d.setDate(d.getDate() - 90);
+      $('from').value = d.toISOString().slice(0, 10); $('to').value = me.today;
+
+      KINDS.forEach(([k, label]) => $('report-tabs').append(el('li', { class: 'nav-item' },
+        el('button', { class: 'nav-link', type: 'button', 'data-key': k, text: label, onclick: () => { active = k; load(); } }))));
+
+      // Status codes -> labels for exports; dates -> DD-MM-YYYY.
+      const cellText = (v, col) => col === report.statusColumn ? (STATUS[v] ? STATUS[v].label : v)
+        : (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? fmtDate(v) : v);
+
+      async function load() {
+        $('report-tabs').querySelectorAll('.nav-link').forEach(b => b.classList.toggle('active', b.dataset.key === active));
+        $('range-note').classList.toggle('d-none', !NO_RANGE.includes(active));
+        try {
+          report = await api.get(`/api/reports/${active}?from=${$('from').value}&to=${$('to').value}`);
+        } catch (e) { showError(e); return; }
+        $('r-title').textContent = report.title;
+        $('r-head').replaceChildren(el('tr', {}, ...report.columns.map(h => el('th', { text: h }))));
+        $('r-body').replaceChildren(...report.rows.map(row => tr(...row.map((v, c) =>
+          c === report.statusColumn ? badge(v) : cellText(v, c)))));
+        if (!report.rows.length) $('r-body').append(emptyRow(report.columns.length, 'No entries in this date range.'));
+        $('r-count').textContent = `${report.rows.length} rows`;
+      }
+      ['from', 'to'].forEach(id => $(id).addEventListener('change', load));
+
+      const fileName = ext => `SupplySmile-${active}-${me.today}.${ext}`;
+      $('pdf').addEventListener('click', () => {
+        if (!window.jspdf) { toast('PDF library did not load. Reload the page (Ctrl+F5).', 'danger'); return; }
+        const doc = new window.jspdf.jsPDF({ orientation: report.columns.length > 6 ? 'landscape' : 'portrait' });
+        doc.setFontSize(14); doc.text(`${me.clinicName} · ${report.title}`, 14, 16);
+        doc.setFontSize(9);
+        doc.text(NO_RANGE.includes(active) ? `As of ${fmtDate(me.today)}` : `${fmtDate($('from').value)} to ${fmtDate($('to').value)}`, 14, 22);
+        // The PDF's built-in font has no rupee sign, so write "Rs." in headers.
+        doc.autoTable({ startY: 27, head: [report.columns.map(c => c.replace('₹', 'Rs.'))],
+          body: report.rows.map(r => r.map((v, c) => String(cellText(v, c) ?? ''))),
+          styles: { fontSize: 8 }, headStyles: { fillColor: [15, 118, 110] } });
+        doc.save(fileName('pdf'));
+      });
+      $('excel').addEventListener('click', () => {
+        if (!window.XLSX) { toast('Excel library did not load. Reload the page (Ctrl+F5).', 'danger'); return; }
+        const ws = XLSX.utils.aoa_to_sheet([report.columns, ...report.rows.map(r => r.map((v, c) => cellText(v, c)))]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, report.title.slice(0, 31));
+        XLSX.writeFile(wb, fileName('xlsx'));
+      });
+      await load();
+    });
+  </script>
+</body>
+</html>

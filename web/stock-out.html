@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Supply Smile">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <title>Write off · Supply Smile</title>
+  <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+  <link href="vendor/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="css/app.css" rel="stylesheet">
+</head>
+<body>
+  <header id="topbar"></header>
+  <div class="d-flex layout">
+    <nav id="sidebar"></nav>
+    <main class="flex-grow-1 p-3 p-md-4">
+      <h1 class="page-title">Write off &amp; single entry</h1>
+      <p class="page-sub">Record wastage, expired stock, or one item at a time.
+        Recording a procedure? <a href="use.html">Procedure use</a> is faster.</p>
+
+      <div class="row g-3">
+        <div class="col-xl-8">
+          <form class="card" id="out-form" novalidate>
+            <div class="card-body">
+              <div class="mb-3">
+                <span class="form-label required d-block" id="reason-label">Reason</span>
+                <div class="btn-group flex-wrap" role="radiogroup" aria-labelledby="reason-label">
+                  <input type="radio" class="btn-check" name="reason" id="r-proc" value="PROCEDURE_USE" checked>
+                  <label class="btn btn-outline-primary" for="r-proc"><i class="bi bi-clipboard2-pulse me-1"></i>Procedure use</label>
+                  <input type="radio" class="btn-check" name="reason" id="r-waste" value="WASTAGE">
+                  <label class="btn btn-outline-primary" for="r-waste"><i class="bi bi-trash3 me-1"></i>Wastage</label>
+                  <input type="radio" class="btn-check" name="reason" id="r-exp" value="EXPIRED">
+                  <label class="btn btn-outline-primary" for="r-exp"><i class="bi bi-calendar-x me-1"></i>Expired</label>
+                </div>
+              </div>
+
+              <div class="row g-3">
+                <div class="col-md-7" id="proc-wrap"><label class="form-label required" for="procedure">Procedure</label>
+                  <select class="form-select" id="procedure"></select><div class="invalid-feedback">Choose the procedure.</div></div>
+                <div class="col-md-5"><label class="form-label required" for="date">Date</label>
+                  <input class="form-control" id="date" type="date" required></div>
+
+                <!-- Item: type to search, or tap a recent item -->
+                <div class="col-12">
+                  <label class="form-label required" for="item-search">Item</label>
+                  <div class="picker">
+                    <div class="input-group has-validation">
+                      <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                      <input class="form-control" id="item-search" placeholder="Type to search, e.g. lido" autocomplete="off"
+                        role="combobox" aria-expanded="false" aria-controls="item-results" aria-autocomplete="list">
+                      <button class="btn btn-outline-secondary d-none" type="button" id="item-clear" aria-label="Clear item"><i class="bi bi-x-lg"></i></button>
+                      <div class="invalid-feedback">Choose an item from the list.</div>
+                    </div>
+                    <div class="list-group picker-results d-none" id="item-results" role="listbox"></div>
+                  </div>
+                  <div class="d-flex flex-wrap align-items-center gap-2 mt-2" id="recent-chips">
+                    <span class="small text-secondary">Recent:</span>
+                  </div>
+                </div>
+
+                <div class="col-md-7"><label class="form-label required" for="batch">Batch</label>
+                  <select class="form-select" id="batch" required></select>
+                  <div class="form-text" id="batch-hint">Soonest expiry is listed first and pre-selected.</div>
+                  <div class="invalid-feedback" id="batch-error">No usable batch for this item.</div></div>
+                <div class="col-md-5"><label class="form-label required" for="qty">Quantity</label>
+                  <div class="input-group stepper has-validation">
+                    <button class="btn btn-outline-secondary" type="button" id="minus" aria-label="Decrease">−</button>
+                    <input class="form-control" id="qty" type="number" min="1" value="1" required inputmode="numeric">
+                    <button class="btn btn-outline-secondary" type="button" id="plus" aria-label="Increase">+</button>
+                    <span class="input-group-text" id="unit">unit</span>
+                    <div class="invalid-feedback" id="qty-error">Enter a quantity of at least 1.</div>
+                  </div>
+                  <div class="form-text" id="available"></div></div>
+
+                <div class="col-12"><label class="form-label" for="note">Note (optional)</label>
+                  <input class="form-control" id="note" placeholder="e.g. syringe dropped" maxlength="255"></div>
+              </div>
+              <div class="alert alert-danger small mt-3 mb-0 d-none" id="form-error" role="alert"></div>
+            </div>
+            <div class="card-footer bg-white d-flex flex-wrap justify-content-end gap-2">
+              <button class="btn btn-light me-auto" type="button" id="clear">Clear</button>
+              <button class="btn btn-outline-primary" type="submit" data-next="1" id="save-next"><i class="bi bi-plus-lg me-1"></i>Save &amp; add another</button>
+              <button class="btn btn-primary" type="submit" id="save"><i class="bi bi-check2 me-1"></i>Save</button>
+            </div>
+          </form>
+        </div>
+        <div class="col-xl-4">
+          <div class="card">
+            <div class="card-header bg-white fw-semibold">Recent usage</div>
+            <ul class="list-group list-group-flush" id="recent-out"></ul>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/fb-core.js"></script>
+  <script src="js/fb-inventory.js"></script>
+  <script src="js/backend.js"></script>
+  <script src="js/common.js"></script>
+  <script>
+    startPage(async me => {
+      const reason = () => document.querySelector('input[name=reason]:checked').value;
+      const [meta, itemsRes] = await Promise.all([api.get('/api/meta'), api.get('/api/items')]);
+      const items = itemsRes.items;
+      let selected = null;       // chosen item
+      let batches = [];          // batches offered for the chosen item
+
+      fillSelect($('procedure'), meta.procedures.map(p => [p.id, p.name]), 'Choose procedure...');
+      $('date').value = me.today;
+
+      // ---------- item search ----------
+      const search = $('item-search'), results = $('item-results');
+      let focusIdx = -1, shown = [];
+      function closeResults() { results.classList.add('d-none'); search.setAttribute('aria-expanded', 'false'); focusIdx = -1; }
+      function renderResults() {
+        const q = search.value.trim().toLowerCase();
+        shown = items.filter(i => !q || i.name.toLowerCase().includes(q)).slice(0, 8);
+        results.replaceChildren();
+        shown.forEach((i, n) => {
+          const name = el('span', {});
+          const at = q ? i.name.toLowerCase().indexOf(q) : -1;
+          if (at >= 0) name.append(i.name.slice(0, at), el('mark', { text: i.name.slice(at, at + q.length) }), i.name.slice(at + q.length));
+          else name.append(i.name);
+          results.append(el('button', { type: 'button', role: 'option', id: 'opt-' + n,
+            class: 'list-group-item list-group-item-action d-flex justify-content-between align-items-center' + (n === focusIdx ? ' focused' : ''),
+            onmousedown: e => { e.preventDefault(); choose(i); } },
+            name, el('span', { class: 'd-flex align-items-center gap-2 small text-secondary' }, `${i.qty} ${i.unit}`, badge(i.status))));
+        });
+        if (!shown.length) results.append(el('div', { class: 'list-group-item small text-secondary', text: 'No item matches.' }));
+        results.classList.remove('d-none');
+        search.setAttribute('aria-expanded', 'true');
+        search.setAttribute('aria-activedescendant', focusIdx >= 0 ? 'opt-' + focusIdx : '');
+      }
+      search.addEventListener('input', () => { selected = null; focusIdx = 0; renderResults(); onItemChanged(); });
+      search.addEventListener('focus', () => { if (!selected) { focusIdx = 0; renderResults(); } });
+      search.addEventListener('blur', () => setTimeout(closeResults, 100));
+      search.addEventListener('keydown', e => {
+        if (results.classList.contains('d-none') && e.key === 'ArrowDown') { renderResults(); return; }
+        if (e.key === 'ArrowDown') { e.preventDefault(); focusIdx = Math.min(focusIdx + 1, shown.length - 1); renderResults(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); focusIdx = Math.max(focusIdx - 1, 0); renderResults(); }
+        else if (e.key === 'Enter' && !results.classList.contains('d-none')) {
+          e.preventDefault(); if (shown[focusIdx]) choose(shown[focusIdx]);
+        } else if (e.key === 'Escape') closeResults();
+      });
+      document.addEventListener('keydown', e => {
+        if (e.key === '/' && !['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+          e.preventDefault(); search.focus();
+        }
+      });
+      $('item-clear').addEventListener('click', () => { selected = null; search.value = ''; onItemChanged(); search.focus(); });
+
+      async function choose(item, preferBatch) {
+        selected = item;
+        search.value = item.name;
+        search.classList.remove('is-invalid');
+        closeResults();
+        await onItemChanged(preferBatch);
+        $('qty').focus(); $('qty').select();
+      }
+
+      // ---------- recent items as one-tap chips ----------
+      async function renderChips() {
+        const { entries } = await api.get('/api/stock/recent?type=OUT&limit=40');
+        const seen = [];
+        entries.forEach(t => { if (!seen.includes(t.itemId)) seen.push(t.itemId); });
+        const chips = $('recent-chips');
+        chips.querySelectorAll('.recent-chip').forEach(c => c.remove());
+        seen.slice(0, 6).map(id => items.find(i => i.id === id)).filter(Boolean).forEach(i =>
+          chips.append(el('button', { type: 'button', class: 'recent-chip' + (selected && selected.id === i.id ? ' selected' : ''),
+            onclick: () => choose(i), text: i.name })));
+      }
+
+      // ---------- batches, quantity ----------
+      async function onItemChanged(preferBatch) {
+        $('item-clear').classList.toggle('d-none', !selected);
+        $('unit').textContent = selected ? selected.unit : 'unit';
+        document.querySelectorAll('.recent-chip').forEach(c => c.classList.toggle('selected', !!selected && c.textContent === selected.name));
+        if (!selected) { batches = []; fillSelect($('batch'), [], 'Choose an item first'); showAvailable(); return; }
+        const res = await api.get(`/api/items/${selected.id}/batches?reason=${reason()}`);
+        batches = res.batches;
+        fillSelect($('batch'), batches.map(b => [b.id,
+          `${b.batchNo} · exp ${fmtDate(b.expiryDate)} · ${b.qty} left` + (b.useFirst ? ' · use first' : '')]),
+          batches.length ? null : (reason() === 'EXPIRED' ? 'No expired batch for this item' : 'No usable batch'));
+        if (preferBatch && batches.some(b => b.id === Number(preferBatch))) $('batch').value = String(preferBatch);
+        $('batch-error').textContent = reason() === 'EXPIRED' ? 'This item has no expired stock.' : 'No usable batch for this item.';
+        showAvailable();
+      }
+      function currentBatch() { return batches.find(b => b.id === Number($('batch').value)); }
+      function showAvailable() {
+        const b = currentBatch();
+        $('available').textContent = b ? `Available in this batch: ${b.qty} ${selected.unit}` : '';
+      }
+      $('batch').addEventListener('change', showAvailable);
+      $('minus').addEventListener('click', () => { $('qty').value = Math.max(1, (Number($('qty').value) || 1) - 1); });
+      $('plus').addEventListener('click', () => {
+        const b = currentBatch(), n = (Number($('qty').value) || 0) + 1;
+        $('qty').value = b ? Math.min(n, b.qty) : n;
+      });
+
+      function onReason() {
+        const proc = reason() === 'PROCEDURE_USE';
+        $('proc-wrap').classList.toggle('d-none', !proc);
+        $('procedure').required = proc;
+        onItemChanged();
+      }
+      document.querySelectorAll('input[name=reason]').forEach(r => r.addEventListener('change', onReason));
+
+      // ---------- recent list ----------
+      async function renderRecent() {
+        const { entries } = await api.get('/api/stock/recent?type=OUT&limit=8');
+        $('recent-out').replaceChildren(...entries.map(t => el('li', { class: 'list-group-item small' },
+          el('div', { class: 'd-flex justify-content-between' },
+            el('span', { class: 'fw-semibold', text: t.itemName }), el('span', { text: `−${t.qty} ${t.unit}` })),
+          el('div', { class: 'text-secondary', text: `${fmtDate(t.date)} · ${t.procedureName || REASON_LABEL[t.reason]} · ${t.userName}` }))));
+        if (!entries.length) $('recent-out').append(el('li', { class: 'list-group-item small text-secondary', text: 'No usage recorded yet.' }));
+      }
+
+      // ---------- save ----------
+      let submitter = null;
+      document.querySelectorAll('#out-form button[type=submit]').forEach(b => b.addEventListener('click', () => { submitter = b; }));
+      $('out-form').addEventListener('submit', async e => {
+        e.preventDefault();
+        const f = e.target, andNext = submitter && submitter.dataset.next === '1';
+        $('form-error').classList.add('d-none');
+        search.classList.toggle('is-invalid', !selected);
+        const b = currentBatch(), qty = Number($('qty').value);
+        $('qty').setCustomValidity(''); $('qty-error').textContent = 'Enter a quantity of at least 1.';
+        if (b && qty > b.qty) { $('qty').setCustomValidity('too many'); $('qty-error').textContent = `Only ${b.qty} left in this batch.`; }
+        if (!f.checkValidity() || !selected) { f.classList.add('was-validated'); return; }
+
+        const payload = { itemId: selected.id, batchId: b.id, quantity: qty, reason: reason(),
+          procedureId: reason() === 'PROCEDURE_USE' ? Number($('procedure').value) : null,
+          txnDate: $('date').value, note: $('note').value };
+        document.querySelectorAll('#out-form button').forEach(x => x.disabled = true);
+        try {
+          const saved = await api.post('/api/stock/out', payload);
+          toast(`Saved: ${saved.qty} ${saved.unit} of ${saved.itemName}.`, 'success', {
+            label: 'Undo', seconds: 10,
+            fn: async () => {
+              try { await api.post(`/api/stock/${saved.id}/undo`); toast('Undone. Stock is back.', 'secondary'); }
+              catch (err) { showError(err); }
+              refreshAfterSave(true);
+            }
+          });
+          // Keep reason, procedure and date for the next item of the same procedure.
+          const keepProc = $('procedure').value;
+          f.classList.remove('was-validated');
+          selected = null; search.value = ''; $('qty').value = 1; $('note').value = '';
+          if (!andNext) { f.reset(); $('date').value = me.today; $('r-proc').checked = true; }
+          else $('procedure').value = keepProc;
+          await refreshAfterSave(false);
+          search.focus();
+        } catch (err) {
+          $('form-error').textContent = err.message;
+          $('form-error').classList.remove('d-none');
+        } finally {
+          document.querySelectorAll('#out-form button').forEach(x => x.disabled = false);
+        }
+      });
+      async function refreshAfterSave(keepSelection) {
+        const fresh = (await api.get('/api/items')).items;
+        items.splice(0, items.length, ...fresh);
+        if (selected) selected = items.find(i => i.id === selected.id) || null;
+        if (!keepSelection) onReason(); else onItemChanged();
+        renderRecent(); renderChips();
+      }
+      // Clear empties the item only; reason, procedure and date stay for the next item of the same patient.
+      $('clear').addEventListener('click', () => {
+        const keep = { reason: reason(), proc: $('procedure').value, date: $('date').value };
+        $('out-form').reset(); $('out-form').classList.remove('was-validated'); $('form-error').classList.add('d-none');
+        document.querySelector(`input[name=reason][value="${keep.reason}"]`).checked = true;
+        selected = null; search.value = ''; $('date').value = keep.date || me.today; onReason();
+        $('procedure').value = keep.proc; search.focus();
+      });
+
+      // ---------- start: dashboard links pass ?item=&batch=&reason= ----------
+      const q = new URLSearchParams(location.search);
+      if (q.get('reason') === 'EXPIRED') $('r-exp').checked = true;
+      if (q.get('reason') === 'WASTAGE') $('r-waste').checked = true;
+      $('proc-wrap').classList.toggle('d-none', reason() !== 'PROCEDURE_USE');
+      $('procedure').required = reason() === 'PROCEDURE_USE';
+      const pre = items.find(i => i.id === Number(q.get('item')));
+      if (pre) await choose(pre, q.get('batch')); else onItemChanged();
+      renderChips(); renderRecent();
+    });
+  </script>
+</body>
+</html>

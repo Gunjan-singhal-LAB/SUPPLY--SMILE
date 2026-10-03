@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Supply Smile">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <title>Kits · Supply Smile</title>
+  <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+  <link href="vendor/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="css/app.css" rel="stylesheet">
+</head>
+<body>
+  <header id="topbar"></header>
+  <div class="d-flex layout">
+    <nav id="sidebar"></nav>
+    <main class="flex-grow-1 p-3 p-md-4 use-page">
+      <h1 class="page-title">Procedure kits</h1>
+      <p class="page-sub">What each procedure normally uses. Staff tap the procedure and these fill in; they can still change them each time.</p>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <section class="card use-card">
+            <div class="use-step">Procedures</div>
+            <div class="d-flex flex-column gap-2" id="procs"></div>
+            <p class="small text-secondary mt-3 mb-0">Add or rename procedures in <a href="settings.html">Settings</a>.</p>
+          </section>
+        </div>
+        <div class="col-md-8">
+          <section class="card use-card">
+            <div class="use-step" id="kit-title">Choose a procedure</div>
+            <div id="lines" class="use-lines"></div>
+            <div class="picker mt-2">
+              <div class="input-group">
+                <span class="input-group-text bg-white"><i class="bi bi-plus-lg"></i></span>
+                <input class="form-control" id="add-search" placeholder="Add an item to this kit" autocomplete="off" aria-label="Add item" disabled>
+              </div>
+              <div class="list-group picker-results d-none" id="add-results"></div>
+            </div>
+            <div class="alert alert-danger small mt-3 mb-0 d-none" id="form-error" role="alert"></div>
+            <div class="d-flex justify-content-end gap-2 mt-3">
+              <button class="btn btn-primary" type="button" id="save" disabled><i class="bi bi-check2 me-1"></i>Save kit</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/fb-core.js"></script>
+  <script src="js/fb-inventory.js"></script>
+  <script src="js/backend.js"></script>
+  <script src="js/common.js"></script>
+  <script>
+    startPage(async me => {
+      if (me.role !== 'ADMIN') { document.querySelector('main').replaceChildren(el('div', { class: 'alert alert-warning', text: 'Only the Admin can edit kits.' })); return; }
+      let [{ kits }, { items }] = await Promise.all([api.get('/api/kits'), api.get('/api/items')]);
+      let current = null, lines = [];
+      function renderProcs() {
+        $('procs').replaceChildren(...kits.map(k => el('button', { class: 'chip-btn' + (current && current.procedureId === k.procedureId ? ' selected' : ''),
+          type: 'button', onclick: () => pick(k.procedureId) },
+          el('span', { class: 'd-block fw-semibold', text: k.procedure }),
+          el('span', { class: 'd-block chip-sub', text: k.lines.length ? k.lines.map(l => l.name).join(', ') : 'No kit yet' }))));
+      }
+      function pick(id) {
+        current = kits.find(k => k.procedureId === id);
+        lines = current.lines.map(l => ({ itemId: l.itemId, qty: l.qty }));
+        $('kit-title').textContent = current.procedure;
+        $('add-search').disabled = false; $('save').disabled = false;
+        history.replaceState(null, '', 'kits.html?procedure=' + id);
+        renderProcs(); renderLines();
+      }
+      function renderLines() {
+        $('lines').replaceChildren(...lines.map((l, idx) => {
+          const it = items.find(i => i.id === l.itemId);
+          const input = el('input', { class: 'form-control text-center', type: 'number', min: '1', value: String(l.qty), 'aria-label': 'Quantity',
+            oninput: e => { l.qty = Math.max(1, parseInt(e.target.value || '1', 10) || 1); } });
+          return el('div', { class: 'use-line-wrap' }, el('div', { class: 'use-line' },
+            el('div', { class: 'min-w-0 flex-grow-1' }, el('div', { class: 'fw-semibold text-truncate', text: it.name }),
+              el('div', { class: 'small text-secondary', text: it.bulk ? 'Everyday consumable: usually recorded under General use' : it.category })),
+            el('div', { class: 'input-group input-group-sm stepper-sm' },
+              el('button', { class: 'btn btn-outline-secondary', type: 'button', onclick: () => { l.qty = Math.max(1, l.qty - 1); input.value = l.qty; } }, '−'),
+              input,
+              el('button', { class: 'btn btn-outline-secondary', type: 'button', onclick: () => { l.qty += 1; input.value = l.qty; } }, '+')),
+            el('span', { class: 'use-unit small text-secondary', text: it.unit }),
+            el('button', { class: 'btn btn-sm btn-link text-secondary px-1', type: 'button', 'aria-label': 'Remove',
+              onclick: () => { lines.splice(idx, 1); renderLines(); } }, el('i', { class: 'bi bi-x-lg' }))));
+        }));
+        if (!lines.length) $('lines').append(el('div', { class: 'use-empty', text: 'No items yet. Search below to add what this procedure uses.' }));
+      }
+      const search = $('add-search'), results = $('add-results');
+      search.addEventListener('input', () => {
+        const t = search.value.trim().toLowerCase();
+        const found = t ? items.filter(i => i.active && i.name.toLowerCase().includes(t) && !lines.some(l => l.itemId === i.id)).slice(0, 8) : [];
+        results.replaceChildren(...found.map(i => el('button', { class: 'list-group-item list-group-item-action', type: 'button',
+          onclick: () => { lines.push({ itemId: i.id, qty: 1 }); search.value = ''; results.classList.add('d-none'); renderLines(); search.focus(); } },
+          i.name, el('span', { class: 'small text-secondary ms-2', text: i.unit }))));
+        results.classList.toggle('d-none', !t);
+      });
+      $('save').addEventListener('click', async () => {
+        $('form-error').classList.add('d-none');
+        try {
+          const saved = await api.put('/api/kits/' + current.procedureId, { lines });
+          kits = kits.map(k => k.procedureId === saved.procedureId ? saved : k);
+          current = saved; renderProcs();
+          toast(`Kit saved for ${saved.procedure}.`);
+        } catch (e) { $('form-error').textContent = e.message; $('form-error').classList.remove('d-none'); }
+      });
+      renderProcs();
+      const pre = Number(new URLSearchParams(location.search).get('procedure'));
+      if (kits.some(k => k.procedureId === pre)) pick(pre); else renderLines();
+    });
+  </script>
+</body>
+</html>

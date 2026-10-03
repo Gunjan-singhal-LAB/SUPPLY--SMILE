@@ -1,0 +1,136 @@
+{
+  "rules": {
+    "public": {
+      ".read": true,
+      ".write": "((auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/role').val() === 'ADMIN') || (auth != null && !root.child('setup').exists() && newData.parent().child('setup').exists())"
+    },
+    "setup": {
+      "$code": {
+        ".write": "auth != null && !root.child('setup').exists() && $code === 'CHANGE-ME' && $code !== 'CHANGE' + '-ME'",
+        ".validate": "newData.val() === auth.uid"
+      }
+    },
+    "clinic": {
+      ".write": "(auth != null && !root.child('setup').exists() && newData.parent().child('setup').exists())",
+      "settings": {
+        ".read": "(auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true)",
+        ".write": "((auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/role').val() === 'ADMIN')"
+      },
+      "people": {
+        ".read": "(auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true)",
+        ".write": "((auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/role').val() === 'ADMIN')",
+        "$u": {
+          ".validate": "newData.hasChildren(['username', 'fullName', 'role', 'active']) && (newData.child('role').val() === 'ADMIN' || newData.child('role').val() === 'STAFF')"
+        }
+      },
+      "uids": {
+        ".read": "((auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/role').val() === 'ADMIN')",
+        ".write": "((auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/role').val() === 'ADMIN')",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid"
+        }
+      },
+      "logins": {
+        ".write": "((auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/role').val() === 'ADMIN')",
+        "$u": {
+          ".read": true
+        }
+      },
+      "suppliers": {
+        ".read": "(auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true)",
+        ".write": "((auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/role').val() === 'ADMIN')",
+        "$id": {
+          ".validate": "newData.child('name').isString()"
+        }
+      },
+      "procedures": {
+        ".read": "(auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true)",
+        ".write": "((auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/role').val() === 'ADMIN')",
+        "$id": {
+          ".validate": "newData.child('name').isString()"
+        }
+      },
+      "items": {
+        ".read": "(auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true)",
+        ".write": "((auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/role').val() === 'ADMIN')",
+        "$id": {
+          ".validate": "newData.hasChildren(['name', 'category', 'unit']) && newData.child('packSize').isNumber() && newData.child('packSize').val() >= 1"
+        }
+      },
+      "batches": {
+        ".read": "(auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true)",
+        ".indexOn": [
+          "itemId"
+        ],
+        "$id": {
+          ".write": "(auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true)",
+          ".validate": "newData.hasChildren(['itemId', 'batchNo', 'received']) && newData.child('qty').isNumber() && newData.child('qty').val() >= 0"
+        },
+        ".write": "((auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/role').val() === 'ADMIN')"
+      },
+      "txns": {
+        ".read": "(auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true)",
+        ".indexOn": [
+          "date",
+          "itemId",
+          "group",
+          "supplierId"
+        ],
+        "$id": {
+          ".write": "(auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true)",
+          ".validate": "!data.exists() && newData.hasChildren(['type', 'reason', 'batchId', 'itemId', 'date', 'by', 'at']) && newData.child('qty').isNumber() && newData.child('qty').val() >= 1"
+        },
+        ".write": "((auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/role').val() === 'ADMIN')"
+      },
+      "reversals": {
+        ".read": "(auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true)",
+        "$id": {
+          ".write": "(auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true)",
+          ".validate": "!data.exists()"
+        },
+        ".write": "((auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/role').val() === 'ADMIN')"
+      },
+      "kits": {
+        ".read": "(auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true)",
+        ".write": "((auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/role').val() === 'ADMIN')"
+      },
+      "flags": {
+        ".read": "(auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true)",
+        "$id": {
+          ".write": "(auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true)"
+        },
+        ".write": "((auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/role').val() === 'ADMIN')"
+      },
+      "counts": {
+        ".read": "((auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/role').val() === 'ADMIN')",
+        ".write": "((auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/role').val() === 'ADMIN')"
+      },
+      "reorder": {
+        ".read": "(auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true)",
+        ".write": "((auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/role').val() === 'ADMIN')"
+      },
+      "counters": {
+        ".read": "(auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true)",
+        "$name": {
+          ".write": "(auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true)",
+          ".validate": "newData.isNumber() && newData.val() > (data.exists() ? data.val() : 0)"
+        },
+        ".write": "((auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/role').val() === 'ADMIN')"
+      },
+      "clock": {
+        "$u": {
+          ".read": "(auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true)",
+          ".write": "(auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && $u === root.child('clinic/uids/' + auth.uid).val()"
+        }
+      },
+      "snapshots": {
+        ".read": "((auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/role').val() === 'ADMIN')",
+        ".write": "((auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/role').val() === 'ADMIN')"
+      },
+      "snapshotData": {
+        ".read": "((auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/role').val() === 'ADMIN')",
+        ".write": "((auth != null && root.child('clinic/uids/' + auth.uid).exists() && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/active').val() === true) && root.child('clinic/people/' + root.child('clinic/uids/' + auth.uid).val() + '/role').val() === 'ADMIN')"
+      }
+    }
+  }
+}

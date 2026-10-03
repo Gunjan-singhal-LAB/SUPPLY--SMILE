@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Supply Smile">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <title>Receive stock · Supply Smile</title>
+  <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+  <link href="vendor/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="css/app.css" rel="stylesheet">
+</head>
+<body>
+  <header id="topbar"></header>
+  <div class="d-flex layout">
+    <nav id="sidebar"></nav>
+    <main class="flex-grow-1 p-3 p-md-4 use-page">
+      <h1 class="page-title">Receive stock</h1>
+      <p class="page-sub">Enter the whole supplier invoice: every item on it, then one Save. Each line becomes a new batch.</p>
+
+      <div class="row g-3">
+        <div class="col-xl-8">
+          <section class="card use-card mb-3">
+            <div class="use-step"><span class="use-num">1</span>Invoice</div>
+            <div class="row g-3">
+              <div class="col-md-5"><label class="form-label required" for="supplier">Supplier</label>
+                <select class="form-select" id="supplier"></select></div>
+              <div class="col-6 col-md-4"><label class="form-label" for="invoice">Invoice number</label>
+                <input class="form-control" id="invoice" placeholder="e.g. GC-5561" maxlength="50"></div>
+              <div class="col-6 col-md-3"><label class="form-label required" for="date">Date received</label>
+                <input class="form-control" id="date" type="date"></div>
+            </div>
+          </section>
+
+          <section class="card use-card mb-3">
+            <div class="use-step d-flex align-items-center"><span class="use-num">2</span>Items on the invoice
+              <span class="small ms-auto fw-normal" id="item-help"></span></div>
+            <div id="quick" class="d-flex flex-wrap gap-2 mb-2"></div>
+            <div id="lines" class="use-lines"></div>
+            <div class="picker mt-2">
+              <div class="input-group">
+                <span class="input-group-text bg-white"><i class="bi bi-plus-lg"></i></span>
+                <input class="form-control" id="add-search" placeholder="Add an item: type to search" autocomplete="off"
+                       role="combobox" aria-expanded="false" aria-controls="add-results" aria-label="Add item">
+              </div>
+              <div class="list-group picker-results d-none" id="add-results" role="listbox"></div>
+            </div>
+            <div class="alert alert-danger small mt-3 mb-0 d-none" id="form-error" role="alert"></div>
+          </section>
+        </div>
+        <div class="col-xl-4">
+          <section class="card dash-card">
+            <div class="dash-card-head"><div><h2 class="dash-card-title">Recent deliveries</h2>
+              <p class="dash-card-sub">One row per invoice · Undo is possible for 2 minutes</p></div></div>
+            <ul class="recent-list" id="recent-in"></ul>
+          </section>
+        </div>
+      </div>
+
+      <div class="save-bar">
+        <div class="small text-secondary" id="save-summary">Choose the supplier and add items</div>
+        <button class="btn btn-primary btn-lg px-4" type="button" id="save" disabled><i class="bi bi-check2-circle me-1"></i>Save invoice</button>
+      </div>
+    </main>
+  </div>
+
+  <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/fb-core.js"></script>
+  <script src="js/fb-inventory.js"></script>
+  <script src="js/backend.js"></script>
+  <script src="js/common.js"></script>
+  <script>
+    const inr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+    startPage(async me => {
+      const [meta, res] = await Promise.all([api.get('/api/meta'), api.get('/api/items')]);
+      let items = res.items.filter(i => i.active);
+      const itemById = id => items.find(i => i.id === id);
+      let lines = [];         // {key, itemId, batchNo, packs, cost, expiry, error}
+      let nextKey = 1;
+      fillSelect($('supplier'), meta.suppliers.map(s => [s.id, s.name]), 'Choose supplier...');
+      $('date').value = me.today; $('date').max = me.today;
+      $('item-help').replaceChildren(me.role === 'ADMIN'
+        ? el('a', { href: 'item.html?new=1', text: 'New item? Add it first' }) : el('span', { class: 'text-secondary', text: 'New item? Ask the Admin to add it' }));
+
+      // Items this supplier usually sends, as one-tap chips.
+      function renderQuick() {
+        const sup = Number($('supplier').value);
+        const usual = sup ? items.filter(i => i.defaultSupplierId === sup && !lines.some(l => l.itemId === i.id)) : [];
+        $('quick').replaceChildren(...(usual.length ? [el('span', { class: 'small text-secondary align-self-center me-1', text: 'Usually from this supplier:' })] : []),
+          ...usual.map(i => el('button', { class: 'recent-chip', type: 'button', onclick: () => addItem(i) }, el('i', { class: 'bi bi-plus me-1' }), i.name)));
+      }
+      $('supplier').addEventListener('change', () => { renderQuick(); updateSave(); });
+
+      function addItem(it) {
+        if (lines.some(l => l.itemId === it.id && !l.batchNo)) return;
+        lines.push({ key: nextKey++, itemId: it.id, batchNo: '', packs: 1, cost: it.lastCost ? String(it.lastCost) : '', expiry: '', error: '' });
+        renderLines();
+        const inputs = $('lines').querySelectorAll('.in-batch');
+        if (inputs.length) inputs[inputs.length - 1].focus();
+      }
+
+      function field(label, input, hint) {
+        return el('div', { class: 'in-field' }, el('label', { class: 'form-label small mb-1', text: label }), input, hint || null);
+      }
+      function renderLines() {
+        const box = $('lines');
+        box.replaceChildren();
+        if (!lines.length) box.append(el('div', { class: 'use-empty', text: 'No items yet. Tap one above or search below.' }));
+        lines.forEach((l, idx) => {
+          const it = itemById(l.itemId);
+          const set = (k, v) => { l[k] = v; l.error = ''; errBox.classList.add('d-none'); updateSave(); };
+          const batch = el('input', { class: 'form-control form-control-sm in-batch', value: l.batchNo, maxlength: '50', placeholder: 'As on the pack',
+            oninput: e => set('batchNo', e.target.value.trim()) });
+          const packs = el('input', { class: 'form-control form-control-sm', type: 'number', min: '1', value: String(l.packs), inputmode: 'numeric',
+            oninput: e => { set('packs', Math.max(0, parseInt(e.target.value || '0', 10) || 0)); unitsHint.textContent = unitsText(); } });
+          const cost = el('input', { class: 'form-control form-control-sm', type: 'number', min: '0', step: '0.01', value: l.cost, inputmode: 'decimal',
+            oninput: e => set('cost', e.target.value) });
+          const exp = el('input', { class: 'form-control form-control-sm', type: 'date', value: l.expiry, disabled: !it.expires,
+            oninput: e => set('expiry', e.target.value) });
+          const unitsText = () => it.packSize > 1 ? `= ${l.packs * it.packSize} ${it.unit}` : it.unit;
+          const unitsHint = el('div', { class: 'form-text mt-0', text: unitsText() });
+          const errBox = el('div', { class: 'small text-danger mt-1' + (l.error ? '' : ' d-none'), text: l.error });
+          box.append(el('div', { class: 'use-line-wrap' + (l.error ? ' has-error' : '') },
+            el('div', { class: 'd-flex align-items-center gap-2 mb-2' },
+              el('span', { class: 'fw-semibold flex-grow-1 text-truncate', text: it.name }),
+              el('span', { class: 'small text-secondary text-nowrap', text: `${it.qty} ${it.unit} in stock` }),
+              el('button', { class: 'btn btn-sm btn-link text-secondary px-1', type: 'button', 'aria-label': `Remove ${it.name}`,
+                onclick: () => { lines.splice(idx, 1); renderLines(); } }, el('i', { class: 'bi bi-x-lg' }))),
+            el('div', { class: 'in-grid' },
+              field('Batch no', batch),
+              field(it.packSize > 1 ? `Packs (1 = ${it.packSize} ${it.unit})` : `Quantity (${it.unit})`, packs, unitsHint),
+              field(`Cost per ${it.unit} (₹)`, cost, it.lastCost ? el('div', { class: 'form-text mt-0', text: `last ₹${it.lastCost}` }) : null),
+              field(it.expires ? 'Expiry date' : 'Expiry', exp, it.expires ? null : el('div', { class: 'form-text mt-0', text: 'does not expire' }))),
+            errBox));
+        });
+        renderQuick(); updateSave();
+      }
+
+      // ---------- search to add ----------
+      const search = $('add-search'), results = $('add-results');
+      let focusIdx = -1, found = [];
+      function showResults() {
+        const t = search.value.trim().toLowerCase();
+        found = t ? items.filter(i => i.name.toLowerCase().includes(t)).slice(0, 8) : [];
+        focusIdx = found.length ? 0 : -1;
+        results.replaceChildren(...found.map((i, n) => el('button', { class: 'list-group-item list-group-item-action d-flex justify-content-between' + (n === 0 ? ' focused' : ''),
+          type: 'button', role: 'option', onclick: () => { addItem(i); search.value = ''; showResults(); } },
+          el('span', { text: i.name }), el('span', { class: 'small text-secondary', text: `${i.qty} ${i.unit}` }))));
+        if (t && !found.length) results.append(el('div', { class: 'list-group-item small text-secondary', text: 'No item found.' }));
+        results.classList.toggle('d-none', !t);
+        search.setAttribute('aria-expanded', String(!!t));
+      }
+      search.addEventListener('input', showResults);
+      search.addEventListener('keydown', e => {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          focusIdx = Math.max(0, Math.min(found.length - 1, focusIdx + (e.key === 'ArrowDown' ? 1 : -1)));
+          [...results.children].forEach((c, n) => c.classList.toggle('focused', n === focusIdx));
+        } else if (e.key === 'Enter' && found[focusIdx]) { e.preventDefault(); addItem(found[focusIdx]); search.value = ''; showResults(); }
+        else if (e.key === 'Escape') { search.value = ''; showResults(); }
+      });
+      document.addEventListener('click', e => { if (!e.target.closest('.picker')) results.classList.add('d-none'); });
+
+      // ---------- checks before saving ----------
+      function lineProblem(l) {
+        const it = itemById(l.itemId);
+        if (!l.batchNo) return 'batch number missing';
+        if (!l.packs) return 'quantity missing';
+        if (it.expires && !l.expiry) return 'expiry date missing';
+        if (l.expiry && l.expiry < me.today) return 'expiry date has passed (check day-month-year)';
+        return '';
+      }
+      function problems() {
+        if (!$('supplier').value) return 'Choose the supplier';
+        if (!lines.length) return 'Add the items on the invoice';
+        const bad = lines.findIndex(l => lineProblem(l));
+        if (bad >= 0) return `${itemById(lines[bad].itemId).name}: ${lineProblem(lines[bad])}`;
+        return '';
+      }
+      function total() { return lines.reduce((s, l) => s + (l.packs * itemById(l.itemId).packSize) * (parseFloat(l.cost) || 0), 0); }
+      function updateSave() {
+        const p = problems();
+        $('save').disabled = !!p;
+        $('save-summary').textContent = p || `${lines.length} item${lines.length === 1 ? '' : 's'} · ${inr.format(total())}`;
+      }
+
+      $('save').addEventListener('click', async () => {
+        if (problems()) return;
+        $('save').disabled = true; $('form-error').classList.add('d-none');
+        const body = { supplierId: Number($('supplier').value), invoiceNo: $('invoice').value, txnDate: $('date').value || me.today,
+          lines: lines.map(l => ({ itemId: l.itemId, batchNo: l.batchNo, quantity: l.packs, unitCost: l.cost, expiryDate: l.expiry || null })) };
+        try {
+          const r = await api.post('/api/stock/in/invoice', body);
+          toast(`Saved invoice: ${r.count} item${r.count === 1 ? '' : 's'}, ${inr.format(r.value)}.`, 'success', { label: 'Undo', seconds: 15, fn: async () => {
+            try { await api.post(`/api/use/${r.group}/undo`); toast('Undone. The delivery is removed.', 'secondary'); await refresh(); }
+            catch (err) { showError(err); } } });
+          lines = []; $('invoice').value = '';
+          await refresh();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch (err) {
+          (err.lines || []).forEach(x => { if (lines[x.line - 1]) lines[x.line - 1].error = x.error; });
+          if (err.lines) renderLines();
+          $('form-error').textContent = err.message; $('form-error').classList.remove('d-none');
+          updateSave();
+        }
+      });
+
+      // ---------- recent deliveries, one row per invoice ----------
+      async function refresh() {
+        const [fresh, recent] = await Promise.all([api.get('/api/items'), api.get('/api/stock/recent?type=IN&limit=60')]);
+        items = fresh.items.filter(i => i.active);
+        const groups = [];
+        recent.entries.filter(t => t.reason === 'PURCHASE').forEach(t => {
+          const key = t.group || `${t.date}|${t.supplierName}|${t.invoiceNo || t.id}`;
+          let g = groups.find(x => x.key === key);
+          if (!g) groups.push(g = { key, t, parts: [] });
+          g.parts.push(`${t.qty} ${t.unit} ${t.itemName}`);
+        });
+        $('recent-in').replaceChildren(...groups.slice(0, 8).map(g => el('li', {},
+          el('span', { class: 'rl-ic in' }, el('i', { class: 'bi bi-truck' })),
+          el('div', { class: 'min-w-0 flex-grow-1' },
+            el('div', { class: 'rl-name text-truncate', text: `${g.t.supplierName || 'Supplier'}${g.t.invoiceNo ? ' · ' + g.t.invoiceNo : ''}` }),
+            el('div', { class: 'rl-sub use-parts', text: g.parts.join(', ') })),
+          el('div', { class: 'rl-sub text-end flex-shrink-0', text: fmtDate(g.t.date) }))));
+        if (!groups.length) $('recent-in').append(el('li', { class: 'small text-secondary', text: 'No deliveries recorded yet.' }));
+        renderLines();
+      }
+      await refresh();
+    });
+  </script>
+</body>
+</html>

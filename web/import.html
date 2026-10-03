@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Supply Smile">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <title>Import from Excel · Supply Smile</title>
+  <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+  <link href="vendor/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="css/app.css" rel="stylesheet">
+</head>
+<body>
+  <header id="topbar"></header>
+  <div class="d-flex layout">
+    <nav id="sidebar"></nav>
+    <main class="flex-grow-1 p-3 p-md-4 use-page">
+      <h1 class="page-title">Import from Excel</h1>
+      <p class="page-sub">Load all your items and what is on the shelf today in one go, instead of typing them one by one.</p>
+
+      <div class="row g-3">
+        <div class="col-lg-5">
+          <section class="card use-card mb-3">
+            <div class="use-step"><span class="use-num">1</span>Get the template</div>
+            <p class="small text-secondary">One row per item. Fill in what you have; only <b>Item name</b> and <b>Unit</b> are required.
+              Opening quantity is in the item's own unit (cartridges, not boxes). Dates as DD-MM-YYYY.</p>
+            <button class="btn btn-outline-primary" type="button" id="template"><i class="bi bi-download me-1"></i>Download template (.xlsx)</button>
+          </section>
+          <section class="card use-card mb-3">
+            <div class="use-step"><span class="use-num">2</span>Choose your filled file</div>
+            <label class="drop-zone" for="file" id="drop">
+              <i class="bi bi-file-earmark-spreadsheet fs-2 text-success"></i>
+              <span class="fw-semibold" id="file-name">Tap to choose an Excel or CSV file</span>
+              <span class="small text-secondary">or drag it here</span>
+            </label>
+            <input type="file" id="file" class="d-none" accept=".xlsx,.xls,.csv">
+            <p class="small text-secondary mt-2 mb-0">Nothing is saved yet. You will see a check of every row first.</p>
+          </section>
+        </div>
+        <div class="col-lg-7">
+          <section class="card use-card">
+            <div class="use-step"><span class="use-num">3</span>Check and import</div>
+            <div id="summary" class="use-empty">Choose a file to see the check here.</div>
+            <div class="table-responsive mt-2 d-none" id="results-wrap" style="max-height:420px">
+              <table class="table table-stack table-sm align-middle mb-0">
+                <thead class="sticky-top bg-white"><tr><th>Row</th><th>Item</th><th>What will happen</th></tr></thead>
+                <tbody id="results"></tbody>
+              </table>
+            </div>
+            <div class="d-flex justify-content-end mt-3">
+              <button class="btn btn-primary btn-lg d-none" type="button" id="go"><i class="bi bi-upload me-1"></i>Import</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="vendor/xlsx/xlsx.full.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/fb-core.js"></script>
+  <script src="js/fb-inventory.js"></script>
+  <script src="js/backend.js"></script>
+  <script src="js/common.js"></script>
+  <script>
+    const COLUMNS = ['Item name', 'Category', 'Unit', 'Pack size', 'Minimum stock', 'Expires (Y/N)', 'Bulk consumable (Y/N)',
+                     'Supplier', 'Opening quantity', 'Batch no', 'Expiry date', 'Cost per unit (Rs)'];
+    startPage(async me => {
+      if (me.role !== 'ADMIN') { document.querySelector('main').replaceChildren(el('div', { class: 'alert alert-warning', text: 'Only the Admin can import.' })); return; }
+      if (!window.XLSX) { $('summary').textContent = 'The Excel reader did not load. Reload the page (Ctrl+F5).'; }
+      const meta = await api.get('/api/meta');
+      let rows = [];
+
+      $('template').addEventListener('click', () => {
+        const wb = XLSX.utils.book_new();
+        // 'Items' starts empty (only this sheet is imported); 'Example' shows how filled rows look.
+        const ws = XLSX.utils.aoa_to_sheet([COLUMNS]);
+        ws['!cols'] = COLUMNS.map(c => ({ wch: Math.max(12, c.length + 2) }));
+        XLSX.utils.book_append_sheet(wb, ws, 'Items');
+        const ex = XLSX.utils.aoa_to_sheet([COLUMNS,
+          ['Lidocaine 2% cartridges', 'Medicines & Anaesthetics', 'cartridge', 50, 50, 'Y', 'N', 'Dentsply India', 100, 'L-5521', '31-12-2027', 38],
+          ['Nitrile gloves (M)', 'Infection Control', 'box', 1, 10, 'N', 'Y', 'MediCare Surgicals', 12, '', '', 420]]);
+        ex['!cols'] = ws['!cols'];
+        XLSX.utils.book_append_sheet(wb, ex, 'Example');
+        const help = [['Categories', 'Units', '', 'Notes'], ...Array.from({ length: Math.max(meta.categories.length, meta.units.length, 6) }, (_, i) => [
+          meta.categories[i] || '', meta.units[i] || '', '',
+          ['Delete the two example rows before importing.', 'Opening quantity is in the unit (e.g. 100 cartridges).',
+           'Items that expire need an expiry date if you enter a quantity.', 'Bulk consumable = everyday item recorded under General use (gloves, masks).',
+           'New suppliers are created automatically.', 'Items already in Supply Smile are not duplicated; only stock is added.'][i] || ''])];
+        const hs = XLSX.utils.aoa_to_sheet(help);
+        hs['!cols'] = [{ wch: 28 }, { wch: 12 }, { wch: 2 }, { wch: 70 }];
+        XLSX.utils.book_append_sheet(wb, hs, 'Help');
+        XLSX.writeFile(wb, 'SupplySmile-items-template.xlsx');
+      });
+
+      async function readFile(file) {
+        $('file-name').textContent = file.name;
+        // Dates stay as Excel day numbers; the server turns them into dates (no time-zone shift).
+        const wb = XLSX.read(await file.arrayBuffer(), { cellDates: false });
+        const ws = wb.Sheets[wb.SheetNames.includes('Items') ? 'Items' : wb.SheetNames[0]];
+        rows = XLSX.utils.sheet_to_json(ws, { defval: '', raw: true });
+        await check();
+      }
+      async function check() {
+        if (!rows.length) { $('summary').className = 'use-empty'; $('summary').textContent = 'The Items sheet is empty. Fill it in (see the Example sheet) and choose the file again.'; $('results-wrap').classList.add('d-none'); $('go').classList.add('d-none'); return; }
+        const r = await api.post('/api/import/items', { rows, checkOnly: true });
+        show(r);
+      }
+      function show(r) {
+        const s = r.summary;
+        $('summary').className = 'import-summary';
+        $('summary').replaceChildren(
+          el('div', { class: 'd-flex flex-wrap gap-3' },
+            el('span', {}, el('strong', { text: s.rows }), ' rows'),
+            el('span', { class: 'text-success' }, el('i', { class: 'bi bi-check-circle me-1' }), el('strong', { text: s.ok }), ' ready'),
+            s.errors ? el('span', { class: 'text-danger' }, el('i', { class: 'bi bi-x-circle me-1' }), el('strong', { text: s.errors }), ' need fixing (skipped)') : '',
+            el('span', { class: 'text-secondary', text: `${s.newItems} new items · ${s.withStock} with opening stock` })),
+          r.checkOnly ? '' : el('div', { class: 'alert alert-success mt-3 mb-0' }, el('i', { class: 'bi bi-check2-circle me-1' }),
+            `Imported. `, el('a', { href: 'items.html', text: 'See your items' }), '.'));
+        $('results-wrap').classList.remove('d-none');
+        $('results').replaceChildren(...r.results.map(x => el('tr', { class: x.status === 'error' ? 'table-danger-subtle' : '' },
+          el('td', { class: 'text-secondary', text: x.row }),
+          el('td', {}, el('i', { class: 'bi me-1 ' + (x.status === 'error' ? 'bi-x-circle text-danger' : x.status === 'note' ? 'bi-info-circle text-warning' : 'bi-check-circle text-success') }), x.name || '(no name)'),
+          el('td', { class: 'small' }, x.status === 'error' ? '' : x.action,
+            ...x.messages.map(m => el('div', { class: x.status === 'error' ? 'text-danger' : 'text-warning-emphasis', text: m }))))));
+        $('go').classList.toggle('d-none', !r.checkOnly || !s.ok);
+        $('go').lastChild.textContent = `Import ${s.ok} row${s.ok === 1 ? '' : 's'}`;
+      }
+      $('go').addEventListener('click', async () => {
+        $('go').disabled = true;
+        try { show(await api.post('/api/import/items', { rows, checkOnly: false })); toast('Import finished.'); }
+        catch (e) { showError(e); } finally { $('go').disabled = false; }
+      });
+      $('file').addEventListener('change', e => { if (e.target.files[0]) readFile(e.target.files[0]).catch(showError); });
+      const drop = $('drop');
+      ['dragover', 'dragenter'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+      ['dragleave', 'drop'].forEach(t => drop.addEventListener(t, () => drop.classList.remove('over')));
+      drop.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]).catch(showError); });
+    });
+  </script>
+</body>
+</html>

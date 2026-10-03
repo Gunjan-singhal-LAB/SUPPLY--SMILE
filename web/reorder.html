@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Supply Smile">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <title>Reorder · Supply Smile</title>
+  <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+  <link href="vendor/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="css/app.css" rel="stylesheet">
+</head>
+<body>
+  <header id="topbar"></header>
+  <div class="d-flex layout">
+    <nav id="sidebar"></nav>
+    <main class="flex-grow-1 p-3 p-md-4 use-page">
+      <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+        <div>
+          <h1 class="page-title">Reorder list</h1>
+          <p class="page-sub">What to order, grouped by supplier. Send each order on WhatsApp in one tap, then mark it as ordered.</p>
+        </div>
+        <button class="btn btn-outline-secondary no-print" type="button" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print / PDF</button>
+      </div>
+
+      <section class="card use-card mb-3 no-print" id="suggest-card">
+        <div class="use-step"><i class="bi bi-lightbulb text-warning"></i>Low or out of stock, not on the list yet</div>
+        <div id="suggest" class="d-flex flex-column gap-2"></div>
+      </section>
+
+      <div id="groups"></div>
+    </main>
+  </div>
+  <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/fb-core.js"></script>
+  <script src="js/fb-inventory.js"></script>
+  <script src="js/backend.js"></script>
+  <script src="js/common.js"></script>
+  <script>
+    startPage(async me => {
+      const isAdmin = me.role === 'ADMIN';
+      function packText(n, label) { return `${n} ${label}${n === 1 || label.endsWith('s') ? '' : (label === 'box' ? 'es' : 's')}`; }
+      function render(data) {
+        // suggestions
+        $('suggest-card').classList.toggle('d-none', !data.suggestions.length);
+        $('suggest').replaceChildren(...data.suggestions.map(s => el('div', { class: 'd-flex align-items-center gap-2 flex-wrap' },
+          el('span', { class: 'flex-grow-1 small' }, badge(s.status), ' ', el('strong', { text: s.name }),
+            ` · ${s.qty} of ${s.min} ${s.unit} left · ${s.supplierName || 'no supplier set'}`),
+          isAdmin ? el('button', { class: 'btn btn-sm btn-outline-primary', type: 'button', onclick: async () => render(await api.put('/api/reorder/' + s.itemId, {})) },
+            el('i', { class: 'bi bi-cart-plus me-1' }), `Add ${packText(s.packs, s.packLabel)}`) : null)));
+        // one card per supplier
+        const box = $('groups');
+        box.replaceChildren();
+        if (!data.groups.length) box.append(el('div', { class: 'use-empty', text: isAdmin
+          ? 'The order list is empty. Add low-stock items from the list above.' : 'The order list is empty.' }));
+        data.groups.forEach(g => {
+          const body = el('div', { class: 'd-flex flex-column gap-2' }, ...g.lines.map(l => {
+            const input = el('input', { class: 'form-control text-center', type: 'number', min: '1', value: String(l.packs), 'aria-label': `Packs of ${l.name}`, disabled: !isAdmin,
+              onchange: async e => { const v = Math.max(1, parseInt(e.target.value || '1', 10) || 1); render(await api.put('/api/reorder/' + l.itemId, { packs: v })); } });
+            return el('div', { class: 'use-line-wrap' }, el('div', { class: 'use-line' },
+              el('div', { class: 'min-w-0 flex-grow-1' }, el('div', { class: 'fw-semibold text-truncate', text: l.name }),
+                el('div', { class: 'small text-secondary', text: `${l.inStock} of ${l.min} ${l.unit} in stock${l.packSize > 1 ? ` · 1 pack = ${l.packSize} ${l.unit}` : ''}` })),
+              el('div', { class: 'input-group input-group-sm stepper-sm' },
+                el('button', { class: 'btn btn-outline-secondary no-print', type: 'button', disabled: !isAdmin, onclick: () => { input.value = Math.max(1, l.packs - 1); input.dispatchEvent(new Event('change')); } }, '−'),
+                input,
+                el('button', { class: 'btn btn-outline-secondary no-print', type: 'button', disabled: !isAdmin, onclick: () => { input.value = l.packs + 1; input.dispatchEvent(new Event('change')); } }, '+')),
+              el('span', { class: 'use-unit small text-secondary', text: l.packLabel }),
+              isAdmin ? el('button', { class: 'btn btn-sm btn-link text-secondary px-1 no-print', type: 'button', 'aria-label': `Remove ${l.name}`,
+                onclick: async () => render(await api.del('/api/reorder/' + l.itemId)) }, el('i', { class: 'bi bi-x-lg' })) : null));
+          }));
+          const actions = el('div', { class: 'd-flex flex-wrap gap-2 mt-3 no-print' },
+            el('a', { class: 'btn btn-whatsapp', href: g.whatsapp, target: '_blank', rel: 'noopener' },
+              el('i', { class: 'bi bi-whatsapp me-1' }), g.hasNumber ? `Send to ${g.contact || g.supplierName} on WhatsApp` : 'Send on WhatsApp (choose contact)'),
+            el('button', { class: 'btn btn-outline-secondary', type: 'button', onclick: async () => {
+              try { await navigator.clipboard.writeText(g.message); toast('Order message copied.', 'secondary'); } catch (e) { showError(e); } } },
+              el('i', { class: 'bi bi-clipboard me-1' }), 'Copy message'),
+            isAdmin ? el('button', { class: 'btn btn-outline-success ms-auto', type: 'button', onclick: async () => {
+              render(await api.post('/api/reorder/ordered', { supplierId: g.supplierId }));
+              toast(`Marked as ordered: ${g.supplierName}. Record the delivery in Receive when it arrives.`); } },
+              el('i', { class: 'bi bi-check2-all me-1' }), 'Mark as ordered') : null);
+          box.append(el('section', { class: 'card use-card mb-3' },
+            el('div', { class: 'use-step d-flex align-items-center' }, el('i', { class: 'bi bi-truck' }), g.supplierName,
+              el('span', { class: 'small text-secondary fw-normal ms-2', text: [g.contact, g.phone].filter(Boolean).join(' · ') || 'no phone saved' }),
+              g.supplierId && !g.hasNumber ? el('a', { class: 'small fw-normal ms-auto no-print', href: 'suppliers.html', text: 'Add mobile number' }) : null),
+            body, actions));
+        });
+      }
+      render(await api.get('/api/reorder'));
+    });
+  </script>
+</body>
+</html>

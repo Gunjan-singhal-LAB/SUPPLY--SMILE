@@ -1,0 +1,5 @@
+# Netlify: publishes the web/ folder as the Supply Smile site. No build step needed.
+# The page rules (security headers, "/" -> sign-in page) are in web/_headers and web/_redirects,
+# so they work both for Git deploys and for drag-and-drop of the web folder.
+[build]
+  publish = "web"

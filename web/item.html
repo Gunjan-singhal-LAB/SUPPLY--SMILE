@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Supply Smile">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <title>Item · Supply Smile</title>
+  <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+  <link href="vendor/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="css/app.css" rel="stylesheet">
+</head>
+<body>
+  <header id="topbar"></header>
+  <div class="d-flex layout">
+    <nav id="sidebar"></nav>
+    <main class="flex-grow-1 p-3 p-md-4">
+      <nav aria-label="breadcrumb"><ol class="breadcrumb small mb-2">
+        <li class="breadcrumb-item"><a href="items.html">Items</a></li>
+        <li class="breadcrumb-item active" id="crumb" aria-current="page">Item</li>
+      </ol></nav>
+
+      <section id="detail" class="d-none">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+          <div class="d-flex align-items-center gap-2">
+            <h1 class="page-title mb-0" id="name"></h1><span id="status-badge"></span>
+            <span class="badge text-bg-secondary d-none" id="inactive-badge">Inactive</span>
+          </div>
+          <div class="d-flex gap-2">
+            <a class="btn btn-outline-primary" id="btn-out"><i class="bi bi-box-arrow-up me-1"></i>Stock Out</a>
+            <button class="btn btn-outline-secondary admin-only" id="btn-edit" type="button"><i class="bi bi-pencil me-1"></i>Edit</button>
+          </div>
+        </div>
+        <div class="row g-3 mb-3" id="facts"></div>
+        <div class="card mb-3">
+          <div class="card-header bg-white fw-semibold">Batches</div>
+          <div class="table-responsive"><table class="table table-stack mb-0 align-middle">
+            <thead><tr><th>Batch</th><th>Expiry</th><th class="text-end">Available</th><th>Unit cost</th><th>Received</th><th>Status</th></tr></thead>
+            <tbody id="batch-rows"></tbody>
+          </table></div>
+        </div>
+        <div class="card">
+          <div class="card-header bg-white fw-semibold">History</div>
+          <div class="table-responsive"><table class="table table-stack table-sm mb-0 align-middle">
+            <thead><tr><th>Date</th><th>Type</th><th>Batch</th><th class="text-end">Qty</th><th>Reason / details</th><th>By</th><th class="admin-only"></th></tr></thead>
+            <tbody id="history-rows"></tbody>
+          </table></div>
+        </div>
+      </section>
+
+      <section id="form-section" class="d-none">
+        <h1 class="page-title" id="form-title">Add item</h1>
+        <p class="page-sub">Items are set up once; quantity comes only from Stock In and Stock Out.</p>
+        <form class="card" id="item-form" novalidate>
+          <div class="card-body row g-3">
+            <div class="col-md-6"><label class="form-label required" for="f-name">Item name</label>
+              <input class="form-control" id="f-name" required maxlength="120"><div class="invalid-feedback">Enter a name.</div></div>
+            <div class="col-md-6"><label class="form-label required" for="f-cat">Category</label>
+              <select class="form-select" id="f-cat" required></select><div class="invalid-feedback">Choose a category.</div></div>
+            <div class="col-6 col-md-3"><label class="form-label required" for="f-unit">Unit</label>
+              <select class="form-select" id="f-unit" required></select></div>
+            <div class="col-6 col-md-3"><label class="form-label required" for="f-pack">Pack size</label>
+              <input class="form-control" id="f-pack" type="number" min="1" value="1" required>
+              <div class="form-text">Units in one purchased pack</div></div>
+            <div class="col-6 col-md-3"><label class="form-label required" for="f-min">Minimum stock</label>
+              <input class="form-control" id="f-min" type="number" min="0" value="0" required>
+              <div class="form-text">Shown as Low at or below this</div></div>
+            <div class="col-6 col-md-3"><label class="form-label" for="f-sup">Default supplier</label>
+              <select class="form-select" id="f-sup"></select></div>
+            <div class="col-12"><div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="f-exp" checked>
+              <label class="form-check-label" for="f-exp">This item has an expiry date</label></div>
+              <div class="form-check form-switch mt-2">
+              <input class="form-check-input" type="checkbox" id="f-bulk">
+              <label class="form-check-label" for="f-bulk">Everyday consumable: recorded under General use, not per procedure
+                <span class="d-block small text-secondary">For cheap everyday items like gloves, masks, cotton rolls, suction tips</span></label></div></div>
+          </div>
+          <div class="alert alert-danger small mx-3 d-none" id="form-error" role="alert"></div>
+          <div class="card-footer bg-white d-flex gap-2 justify-content-between">
+            <button class="btn btn-outline-danger d-none" type="button" id="btn-active"></button>
+            <div class="ms-auto d-flex gap-2">
+              <a class="btn btn-light" id="btn-cancel" href="items.html">Cancel</a>
+              <button class="btn btn-primary" type="submit">Save item</button>
+            </div>
+          </div>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/fb-core.js"></script>
+  <script src="js/fb-inventory.js"></script>
+  <script src="js/backend.js"></script>
+  <script src="js/common.js"></script>
+  <script>
+    startPage(async me => {
+      const q = new URLSearchParams(location.search);
+      const isNew = q.get('new') === '1', id = Number(q.get('id'));
+      const meta = await api.get('/api/meta');
+      fillSelect($('f-cat'), meta.categories.map(c => [c, c]), 'Choose...');
+      fillSelect($('f-unit'), meta.units.map(u => [u, u]));
+      fillSelect($('f-sup'), meta.suppliers.map(s => [s.id, s.name]), 'None');
+      let item = null;
+
+      function showForm(editing) {
+        if (me.role !== 'ADMIN') { toast('Only Admin can add or edit items.', 'danger'); return; }
+        $('detail').classList.add('d-none');
+        $('form-section').classList.remove('d-none');
+        $('form-title').textContent = editing ? 'Edit item' : 'Add item';
+        $('crumb').textContent = editing ? item.name : 'Add item';
+        if (editing) {
+          $('f-name').value = item.name; $('f-cat').value = item.category; $('f-unit').value = item.unit;
+          $('f-pack').value = item.packSize; $('f-min').value = item.minStockLevel;
+          $('f-sup').value = item.defaultSupplierId || ''; $('f-exp').checked = item.expires; $('f-bulk').checked = item.bulk;
+          $('btn-active').textContent = item.active ? 'Mark inactive' : 'Make active again';
+          $('btn-active').classList.remove('d-none');
+          $('btn-cancel').href = 'item.html?id=' + item.id;
+        }
+      }
+
+      if (isNew) { showForm(false); }
+      else if (!id) { location.href = 'items.html'; return; }
+      else {
+        const d = await api.get('/api/items/' + id);
+        item = d.item;
+        document.title = item.name + ' · Supply Smile';
+        $('crumb').textContent = item.name; $('name').textContent = item.name;
+        $('status-badge').append(badge(item.status));
+        $('inactive-badge').classList.toggle('d-none', item.active);
+        $('btn-out').href = 'stock-out.html?item=' + item.id;
+        [['In stock', `${item.qty} ${item.unit}`], ['Minimum', `${item.minStockLevel} ${item.unit}`],
+         ['Category', item.category], ['Pack size', `${item.packSize} ${item.unit} per pack`],
+         ['Default supplier', item.supplierName || '-'], ['Expires', item.expires ? 'Yes' : 'No']]
+          .forEach(([k, v]) => $('facts').append(el('div', { class: 'col-6 col-md-4 col-xl-2' },
+            el('div', { class: 'card h-100' }, el('div', { class: 'card-body py-2' },
+              el('div', { class: 'small text-secondary', text: k }), el('div', { class: 'fw-semibold', text: v }))))));
+        d.batches.forEach(b => {
+          const r = tr(b.batchNo, fmtDate(b.expiryDate), `${b.qty} ${item.unit}`, '₹' + b.unitCost, fmtDate(b.receivedDate), badge(b.status));
+          r.children[2].classList.add('text-end'); $('batch-rows').append(r);
+        });
+        if (!d.batches.length) $('batch-rows').append(emptyRow(6, 'No stock received yet.'));
+        d.history.forEach(t => {
+          const details = t.reason === 'PURCHASE' ? `Purchase · ${t.supplierName || ''} · ${t.invoiceNo || ''}`
+            : t.reason === 'PROCEDURE_USE' ? t.procedureName : (t.note ? `${REASON_LABEL[t.reason]} · ${t.note}` : REASON_LABEL[t.reason]);
+          const correctBtn = me.role === 'ADMIN' && t.reason !== 'CORRECTION'
+            ? el('button', { class: 'btn btn-sm btn-link p-0', type: 'button', text: 'Correct',
+                onclick: async () => {
+                  if (!confirm(`Reverse this entry (${t.type} ${t.qty} ${t.unit} on ${fmtDate(t.date)})? A correction entry will be added.`)) return;
+                  try { await api.post(`/api/stock/${t.id}/correct`); toast('Correction recorded.'); setTimeout(() => location.reload(), 600); }
+                  catch (e) { showError(e); }
+                } }) : '';
+          const r = tr(fmtDate(t.date), el('span', { class: 'badge ' + (t.type === 'IN' ? 'text-bg-success' : 'text-bg-secondary'), text: t.type }),
+            t.batchNo, (t.type === 'IN' ? '+' : '−') + t.qty, details, t.userName, correctBtn);
+          r.children[3].classList.add('text-end');
+          if (me.role !== 'ADMIN') r.lastChild.classList.add('d-none');
+          $('history-rows').append(r);
+        });
+        if (!d.history.length) $('history-rows').append(emptyRow(7, 'No entries yet.'));
+        $('detail').classList.remove('d-none');
+      }
+
+      $('btn-edit').addEventListener('click', () => showForm(true));
+      $('btn-active').addEventListener('click', async () => {
+        try {
+          await api.put('/api/items/' + item.id, { active: !item.active });
+          toast(item.active ? 'Item marked inactive (history kept).' : 'Item is active again.');
+          setTimeout(() => location.href = 'item.html?id=' + item.id, 700);
+        } catch (e) { showError(e); }
+      });
+      $('item-form').addEventListener('submit', async e => {
+        e.preventDefault();
+        const f = e.target;
+        $('form-error').classList.add('d-none');
+        if (!f.checkValidity()) { f.classList.add('was-validated'); return; }
+        const data = { name: $('f-name').value, category: $('f-cat').value, unit: $('f-unit').value,
+          packSize: Number($('f-pack').value), minStockLevel: Number($('f-min').value),
+          defaultSupplierId: $('f-sup').value ? Number($('f-sup').value) : null, expires: $('f-exp').checked, bulk: $('f-bulk').checked };
+        try {
+          const saved = item ? await api.put('/api/items/' + item.id, data) : await api.post('/api/items', data);
+          toast('Item saved.');
+          setTimeout(() => location.href = 'item.html?id=' + saved.id, 700);
+        } catch (err) { $('form-error').textContent = err.message; $('form-error').classList.remove('d-none'); }
+      });
+    });
+  </script>
+</body>
+</html>

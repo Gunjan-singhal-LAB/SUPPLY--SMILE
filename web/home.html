@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Supply Smile">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <title>Home · Supply Smile</title>
+  <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+  <link href="vendor/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="css/app.css" rel="stylesheet">
+</head>
+<body>
+  <header id="topbar"></header>
+  <div class="d-flex layout">
+    <nav id="sidebar"></nav>
+    <main class="flex-grow-1 p-3 p-md-4 home">
+      <h1 class="home-hello" id="hello">Welcome</h1>
+      <p class="text-secondary mb-0" id="today-line"></p>
+
+      <!-- The two things done many times a day -->
+      <div class="home-actions">
+        <a class="big-action" href="use.html" style="background:linear-gradient(135deg,#0f766e,#14958a)">
+          <span class="ba-ic"><i class="bi bi-clipboard2-pulse"></i></span>
+          <span><span class="d-block ba-title">Procedure use</span><span class="d-block ba-sub">Pick the procedure, tap Save</span></span>
+        </a>
+        <a class="big-action" href="stock-in.html" style="background:linear-gradient(135deg,#1d4ed8,#3b82f6)">
+          <span class="ba-ic"><i class="bi bi-box-arrow-in-down"></i></span>
+          <span><span class="d-block ba-title">Receive stock</span><span class="d-block ba-sub">Record a delivery from a supplier</span></span>
+        </a>
+      </div>
+
+      <div id="start"></div>
+      <div id="alerts"></div>
+
+      <div class="home-section">All tools</div>
+      <div class="app-grid" id="apps"></div>
+    </main>
+  </div>
+
+  <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/fb-core.js"></script>
+  <script src="js/fb-inventory.js"></script>
+  <script src="js/backend.js"></script>
+  <script src="js/common.js"></script>
+  <script>
+    startPage(async me => {
+      const isAdmin = me.role === 'ADMIN';
+      const h = new Date().getHours();
+      $('hello').textContent = `${h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'}, ${me.fullName}`;
+      $('today-line').textContent = new Date(me.today + 'T00:00:00').toLocaleDateString('en-IN',
+        { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+      const counts = await api.get('/api/alerts/counts');
+
+      // A brand-new clinic: show the few steps that get it running.
+      if (!counts.totalItems) {
+        const step = (n, icon, title, sub, href, show) => show ? el('a', { class: 'home-alert', href },
+          el('span', { class: 'ha-ic', style: 'background:#d9efec;color:#0f766e' }, el('i', { class: 'bi bi-' + icon })),
+          el('span', { class: 'flex-grow-1' }, el('span', { class: 'd-block small fw-semibold', text: `${n}. ${title}` }),
+            el('span', { class: 'd-block small text-secondary', text: sub })),
+          el('i', { class: 'bi bi-chevron-right text-secondary' })) : null;
+        $('start').append(el('div', { class: 'home-section', text: new URLSearchParams(location.search).get('welcome') ? `Welcome! Let's get ${me.clinicName} ready` : 'Getting started' }),
+          ...(isAdmin ? [
+            step(1, 'truck', 'Add your suppliers', 'Name and WhatsApp number of each dealer', 'suppliers.html', true),
+            step(2, 'file-earmark-spreadsheet', 'Load your items and current stock', 'Fill the Excel template once, or add items one by one', 'import.html', true),
+            step(3, 'collection', 'Set up procedure kits', 'What each procedure normally uses', 'kits.html', true),
+            step(4, 'people', 'Add your staff', 'Each person gets their own sign-in', 'settings.html', true)]
+          : [el('div', { class: 'home-alert small text-secondary', text: 'No items yet. The Admin is still setting up Supply Smile.' })]));
+      }
+      const badges = appBadges(counts);
+      $('apps').replaceChildren(...APPS.filter(a => !['use', 'receive'].includes(a.key) && (!a.admin || isAdmin)).map(a => {
+        const b = badges[a.key];
+        return el('a', { class: 'app-icon', href: a.href, title: a.desc + (b ? ' · ' + b.title : '') },
+          el('span', { class: 'ai-tile', style: `background:linear-gradient(145deg, ${a.color}, ${a.color}cc)` },
+            el('i', { class: 'bi bi-' + a.icon }),
+            b ? el('span', { class: 'nav-badge ' + b.cls, text: String(b.n) }) : null),
+          el('span', { class: 'ai-label', text: a.label }));
+      }));
+
+      // Short, plain-language list of what needs doing (each opens the right screen).
+      const rows = [];
+      const reorder = counts.low + counts.out;
+      if (counts.expired) rows.push({ ic: 'calendar-x', bg: '#fee2e2', fg: '#b91c1c', href: 'index.html',
+        text: `${counts.expired} expired batch${counts.expired === 1 ? '' : 'es'} to write off` });
+      if (counts.flags) rows.push({ ic: 'flag', bg: '#fee2e2', fg: '#b91c1c', href: isAdmin ? 'count.html' : 'index.html',
+        text: `${counts.flags} item${counts.flags === 1 ? '' : 's'} used while showing 0 · check the shelf` });
+      if (reorder) rows.push({ ic: 'cart-plus', bg: '#fef3c7', fg: '#b45309', href: 'items.html?status=REORDER',
+        text: `${reorder} item${reorder === 1 ? '' : 's'} to reorder (${counts.low} low, ${counts.out} out)` });
+      if (counts.nearExpiry) rows.push({ ic: 'hourglass-split', bg: '#e0f2fe', fg: '#0369a1', href: 'index.html',
+        text: `${counts.nearExpiry} batch${counts.nearExpiry === 1 ? '' : 'es'} expiring within ${me.nearExpiryDays} days · use first` });
+      if (rows.length) $('alerts').append(el('div', { class: 'home-section', text: 'Needs attention' }), ...rows.map(r =>
+        el('a', { class: 'home-alert', href: r.href },
+          el('span', { class: 'ha-ic', style: `background:${r.bg};color:${r.fg}` }, el('i', { class: 'bi bi-' + r.ic })),
+          el('span', { class: 'flex-grow-1 small fw-semibold', text: r.text }),
+          el('i', { class: 'bi bi-chevron-right text-secondary' }))));
+    });
+  </script>
+</body>
+</html>
